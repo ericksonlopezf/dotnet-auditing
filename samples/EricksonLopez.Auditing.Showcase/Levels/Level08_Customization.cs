@@ -65,7 +65,7 @@ public sealed class ShowcaseAmbientContextProvider : IAuditContextProvider
 public sealed class ShowcaseKmsAuditIntegrityProvider : IAuditIntegrityProvider
 {
     // Clave de 32 bytes (256 bits) para HMAC-SHA256
-    private static readonly byte[] s_masterKmsKey = new byte[]
+    private static readonly byte[] _masterKmsKey = new byte[]
     {
         0x1A, 0x2B, 0x3C, 0x4D, 0x5E, 0x6F, 0x70, 0x81,
         0x92, 0xA3, 0xB4, 0xC5, 0xD6, 0xE7, 0xF8, 0x09,
@@ -76,7 +76,7 @@ public sealed class ShowcaseKmsAuditIntegrityProvider : IAuditIntegrityProvider
     public ReadOnlyMemory<byte> GetCurrentKey(string tenantId)
     {
         // En producción: derivar o recuperar la clave del KMS específica para el tenant
-        return s_masterKmsKey;
+        return _masterKmsKey;
     }
 }
 

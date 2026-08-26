@@ -15,10 +15,6 @@ namespace EricksonLopez.Auditing.UnitTests;
 
 public sealed class EfCoreAuditStoreTests
 {
-    private static readonly string[] IndexPropTenantOccurredId = new[] { "TenantId", "OccurredAt", "Id" };
-    private static readonly string[] IndexPropTenantCorr = new[] { "TenantId", "CorrelationId" };
-    private static readonly string[] IndexPropTenantResource = new[] { "TenantId", "ResourceType", "ResourceId" };
-
     private static IDbContextFactory<AuditDbContext> CreateFactory(string dbName)
     {
         var services = new ServiceCollection();

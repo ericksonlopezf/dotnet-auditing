@@ -240,7 +240,7 @@ public sealed class AuditSensitivityPipelineTests
         act.Should().Throw<ArgumentNullException>().WithParameterName("config");
     }
 
-    private static readonly string[] s_expectedCriticalActionCodes =
+    private static readonly string[] _expectedCriticalActionCodes =
     [
         AuditAction.Login.Code,
         AuditAction.Delete.Code,
@@ -248,7 +248,7 @@ public sealed class AuditSensitivityPipelineTests
         AuditAction.RevokePermission.Code
     ];
 
-    private static readonly string[] s_expectedGlobalDenylist =
+    private static readonly string[] _expectedGlobalDenylist =
     [
         "Password",
         "PasswordHash",
@@ -279,13 +279,13 @@ public sealed class AuditSensitivityPipelineTests
         config.BatchSize.Should().Be(100);
         config.BatchFlushInterval.Should().Be(TimeSpan.FromSeconds(5));
 
-        config.CriticalActionCodes.Should().BeEquivalentTo(s_expectedCriticalActionCodes);
+        config.CriticalActionCodes.Should().BeEquivalentTo(_expectedCriticalActionCodes);
         config.CriticalActionCodes.Contains("login").Should().BeTrue();
         config.CriticalActionCodes.Contains("LOGIN").Should().BeTrue();
         config.CriticalActionCodes.Contains("delete").Should().BeTrue();
         config.CriticalActionCodes.Contains("DELETE").Should().BeTrue();
 
-        config.GlobalFieldDenylist.Should().BeEquivalentTo(s_expectedGlobalDenylist);
+        config.GlobalFieldDenylist.Should().BeEquivalentTo(_expectedGlobalDenylist);
         config.GlobalFieldDenylist.Contains("password").Should().BeTrue();
         config.GlobalFieldDenylist.Contains("PASSWORD").Should().BeTrue();
         config.GlobalFieldDenylist.Contains("token").Should().BeTrue();

@@ -11,7 +11,7 @@ namespace EricksonLopez.Auditing;
 /// </remarks>
 public sealed class AuditScope : IDisposable
 {
-    private static readonly AsyncLocal<AuditScope?> s_current = new();
+    private static readonly AsyncLocal<AuditScope?> _current = new();
 
     private readonly AuditScope? _parent;
     private readonly Dictionary<string, string> _metadata;
@@ -24,7 +24,7 @@ public sealed class AuditScope : IDisposable
     }
 
     /// <summary>Gets the current ambient <see cref="AuditScope"/>, or <see langword="null"/> if none is active.</summary>
-    public static AuditScope? Current => s_current.Value;
+    public static AuditScope? Current => _current.Value;
 
     /// <summary>Gets the metadata key-value pairs registered within this scope.</summary>
     public IReadOnlyDictionary<string, string> Metadata => _metadata;
@@ -39,7 +39,7 @@ public sealed class AuditScope : IDisposable
     /// </remarks>
     public static AuditScope Begin(IReadOnlyDictionary<string, string>? initialMetadata = null)
     {
-        var parent = s_current.Value;
+        var parent = _current.Value;
         var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
 
         if (initialMetadata is not null)
@@ -72,6 +72,6 @@ public sealed class AuditScope : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        s_current.Value = _parent;
+        _current.Value = _parent;
     }
 }
