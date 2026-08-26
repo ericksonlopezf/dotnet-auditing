@@ -1,4 +1,5 @@
 // Copyright © Erickson Lopez. MIT License.
+using System.Collections.Generic;
 using BenchmarkDotNet.Attributes;
 using EricksonLopez.Auditing;
 

@@ -24,9 +24,6 @@ name: Mutation Testing (Stryker)
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       mutation-level:
@@ -38,6 +35,13 @@ on:
           - Basic
           - Standard
           - Advanced
+  workflow_call:
+    inputs:
+      mutation-level:
+        description: "Stryker mutation level (Basic, Standard, Advanced)"
+        required: false
+        default: "Standard"
+        type: string
   # Weekly scheduled execution (Monday 04:00 UTC) to catch regressions early
   schedule:
     - cron: "0 4 * * 1"
@@ -136,7 +140,6 @@ jobs:
           set +e
           dotnet stryker \
             --config-file ${{ matrix.config }} \
-            --test-runner mtp \
             --mutation-level ${{ inputs.mutation-level || 'Standard' }} \
             --output ${{ matrix.output-dir }}
           STRYKER_EXIT_CODE=$?
