@@ -8,7 +8,7 @@
     <Company>EricksonLopez</Company>
     <Copyright>Copyright © 2026 Erickson Lopez.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://ericksonlopez.dev/dotnet-auditing</PackageProjectUrl>
+    <PackageProjectUrl>https://ericksonlopez.dev/auditing</PackageProjectUrl>
     <RepositoryUrl>https://github.com/ericksonlopezf/dotnet-auditing</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <CommonPackageTags>dotnet;csharp;auditing;audit-trail;change-tracking;compliance;security</CommonPackageTags>
