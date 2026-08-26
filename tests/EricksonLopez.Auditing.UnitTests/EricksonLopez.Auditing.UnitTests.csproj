@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="FsCheck.Xunit" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Abstractions\EricksonLopez.Auditing.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing\EricksonLopez.Auditing.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Testing\EricksonLopez.Auditing.Testing.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.PostgreSql\EricksonLopez.Auditing.PostgreSql.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.SqlServer\EricksonLopez.Auditing.SqlServer.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Sqlite\EricksonLopez.Auditing.Sqlite.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.MySql\EricksonLopez.Auditing.MySql.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Oracle\EricksonLopez.Auditing.Oracle.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.OpenTelemetry\EricksonLopez.Auditing.OpenTelemetry.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.EntityFrameworkCore\EricksonLopez.Auditing.EntityFrameworkCore.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.MongoDb\EricksonLopez.Auditing.MongoDb.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Dapper\EricksonLopez.Auditing.Dapper.csproj" />
+  </ItemGroup>
+
+</Project>

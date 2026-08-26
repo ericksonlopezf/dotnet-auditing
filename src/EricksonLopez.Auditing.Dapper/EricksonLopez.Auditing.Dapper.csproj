@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <AssemblyName>EricksonLopez.Auditing.Dapper</AssemblyName>
+    <RootNamespace>EricksonLopez.Auditing.Dapper</RootNamespace>
+    <PackageId>EricksonLopez.Auditing.Dapper</PackageId>
+    <Description>Generic database-agnostic Dapper adapter for EricksonLopez.Auditing. Provides high-performance audit trail persistence over any ADO.NET IDbConnection using Dapper.</Description>
+    <PackageTags>$(CommonPackageTags);dapper;micro-orm;sql;database-agnostic;native-aot</PackageTags>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Auditing.Abstractions\EricksonLopez.Auditing.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,108 @@
+# Top-most EditorConfig file for EricksonLopez.Auditing ecosystem
+root = true
+
+# All files
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Markdown files
+[*.md]
+indent_size = 2
+trim_trailing_whitespace = false
+
+# JSON files
+[*.json]
+indent_size = 2
+
+# YAML files
+[*.{yml,yaml}]
+indent_size = 2
+
+# C# files
+[*.cs]
+# Standard C# formatting preferences
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_indent_labels = one_less_than_current
+
+# Style and Naming Rules (IDE1006)
+dotnet_diagnostic.IDE1006.severity = warning
+
+# Interface naming rule
+dotnet_naming_rule.interface_should_be_begins_with_i.symbols = interface
+dotnet_naming_rule.interface_should_be_begins_with_i.style = begins_with_i
+dotnet_naming_rule.interface_should_be_begins_with_i.severity = warning
+
+dotnet_naming_symbols.interface.applicable_kinds = interface
+dotnet_naming_symbols.interface.applicable_accessibilities = *
+
+dotnet_naming_style.begins_with_i.required_prefix = I
+dotnet_naming_style.begins_with_i.capitalization = pascal_case
+
+# Types naming rule (PascalCase)
+dotnet_naming_rule.types_should_be_pascal_case.symbols = types
+dotnet_naming_rule.types_should_be_pascal_case.style = pascal_case
+dotnet_naming_rule.types_should_be_pascal_case.severity = warning
+
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum, record, delegate
+dotnet_naming_symbols.types.applicable_accessibilities = *
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+# Private fields rule (_camelCase)
+dotnet_naming_rule.private_fields_should_be_underscore_camel_case.symbols = private_fields
+dotnet_naming_rule.private_fields_should_be_underscore_camel_case.style = underscore_camel_case
+dotnet_naming_rule.private_fields_should_be_underscore_camel_case.severity = warning
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+
+# Type parameters rule (T* or PascalCase)
+dotnet_naming_rule.type_parameters_should_begin_with_t.symbols = type_parameters
+dotnet_naming_rule.type_parameters_should_begin_with_t.style = begins_with_t
+dotnet_naming_rule.type_parameters_should_begin_with_t.severity = warning
+
+dotnet_naming_symbols.type_parameters.applicable_kinds = type_parameter
+dotnet_naming_symbols.type_parameters.applicable_accessibilities = *
+
+dotnet_naming_style.begins_with_t.required_prefix = T
+dotnet_naming_style.begins_with_t.capitalization = pascal_case
+
+# Core Code Analysis Rules
+dotnet_diagnostic.CA1707.severity = warning   # Identifiers should not contain underscores
+dotnet_diagnostic.CA1852.severity = warning   # Seal internal types
+dotnet_diagnostic.CA1305.severity = warning   # Specify IFormatProvider
+dotnet_diagnostic.CS0618.severity = error     # Member is obsolete (Zero tolerance)
+dotnet_diagnostic.CS0619.severity = error     # Member is obsolete (Zero tolerance)
+dotnet_diagnostic.xUnit1051.severity = warning # xUnit analyzer checks
+dotnet_diagnostic.CS1591.severity = warning   # Missing XML comment for publicly visible type or member
+
+# Test Projects Overrides
+[tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none      # Test method names often use underscores for readability
+dotnet_diagnostic.CA1852.severity = suggestion
+dotnet_diagnostic.CS1591.severity = none      # Test classes and methods do not require XML docs
+
+# Benchmark Projects Overrides
+[benchmarks/**.cs]
+dotnet_diagnostic.CS1591.severity = none
+dotnet_diagnostic.CA1822.severity = none
+
+# Showcase / Sample Projects Overrides
+[samples/**.cs]
+dotnet_diagnostic.CS1591.severity = none
+dotnet_diagnostic.CA1707.severity = none
