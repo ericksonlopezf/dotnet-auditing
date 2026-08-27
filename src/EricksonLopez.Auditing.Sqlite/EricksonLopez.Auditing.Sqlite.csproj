@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Description>SQLite adapter for EricksonLopez.Auditing. Ideal for edge computing, desktop applications, local testing, and offline-first scenarios. AOT-compatible.</Description>
+    <PackageTags>$(CommonPackageTags);sqlite;embedded-database;edge;dapper;multi-tenant;native-aot</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Auditing.Abstractions\EricksonLopez.Auditing.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

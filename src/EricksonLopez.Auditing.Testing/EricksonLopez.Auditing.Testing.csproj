@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Description>Test helpers for EricksonLopez.Auditing: in-memory audit store, assertion helpers, and store verification utilities. Do NOT reference in production code.</Description>
+    <PackageTags>$(CommonPackageTags);testing;test-doubles;in-memory;test-helpers;fluent-builder;native-aot</PackageTags>
+    <!--
+      This package is AOT-compatible; InMemoryAuditStore uses no reflection.
+      Consumers using this in production code are doing it wrong.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Auditing.Abstractions\EricksonLopez.Auditing.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

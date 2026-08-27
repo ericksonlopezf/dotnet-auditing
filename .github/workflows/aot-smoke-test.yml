@@ -1,0 +1,31 @@
+# Copyright © Erickson Lopez. MIT License.
+name: NativeAOT Smoke Test
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-version:
+        description: ".NET SDK version to use"
+        required: false
+        type: string
+        default: "10.0.x"
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  aot-smoke-test:
+    name: NativeAOT Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: AOT Publish Smoke Test
+        run: dotnet publish tests/EricksonLopez.Auditing.AotSmokeTest/EricksonLopez.Auditing.AotSmokeTest.csproj -c Release -r linux-x64 --self-contained
