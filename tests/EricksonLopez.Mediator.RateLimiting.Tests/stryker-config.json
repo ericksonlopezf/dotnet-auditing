@@ -1,0 +1,22 @@
+{
+  "stryker-config": {
+    "project": "EricksonLopez.Mediator.RateLimiting.csproj",
+    "concurrency": 2,
+    "coverage-analysis": "off",
+    "thresholds": {
+      "high": 100,
+      "low": 98,
+      "break": 95
+    },
+    "reporters": [
+      "html",
+      "json",
+      "cleartext",
+      "progress"
+    ],
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose"
+    ]
+  }
+}

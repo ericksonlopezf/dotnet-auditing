@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>Rate limiting pipeline behavior for EricksonLopez.Mediator based on System.Threading.RateLimiting.</Description>
+    <PackageTags>$(CommonPackageTags);rate-limiting;rate-limiter;throttling;concurrency-limiter;traffic-control</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Mediator\EricksonLopez.Mediator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Threading.RateLimiting" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EricksonLopez.Mediator.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Mediator.RateLimiting.Tests" />
+  </ItemGroup>
+
+</Project>

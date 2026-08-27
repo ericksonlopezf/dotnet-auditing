@@ -1,0 +1,10 @@
+// Copyright © Erickson Lopez. MIT License.
+using System;
+using System.ComponentModel;
+
+namespace System.Runtime.CompilerServices
+{
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    internal static class IsExternalInit { }
+}
+

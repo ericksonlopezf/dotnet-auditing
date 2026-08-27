@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>Polly v8 resilience policies and pipeline integration for EricksonLopez.Mediator.</Description>
+    <PackageTags>$(CommonPackageTags);polly;resilience;resilience-pipeline;retry;circuit-breaker;fault-tolerance</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Mediator\EricksonLopez.Mediator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Polly.Core" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EricksonLopez.Mediator.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Mediator.Polly.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>FluentValidation pipeline behavior and extensions for EricksonLopez.Mediator.</Description>
+    <PackageTags>$(CommonPackageTags);fluentvalidation;validation;validation-behavior;input-validation</PackageTags>
+    <!-- Native AOT: this package uses [RequiresUnreferencedCode] on assembly-scanning helpers.
+         ValidationPipelineBehavior<TRequest,TResponse> itself is AOT-safe when validators
+         are registered explicitly (without assembly scanning). -->
+    <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">false</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Mediator\EricksonLopez.Mediator.csproj" />
+    <ProjectReference Include="..\EricksonLopez.Mediator.Result\EricksonLopez.Mediator.Result.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EricksonLopez.Result.FluentValidation" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EricksonLopez.Mediator.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Mediator.FluentValidation.Tests" />
+  </ItemGroup>
+
+</Project>

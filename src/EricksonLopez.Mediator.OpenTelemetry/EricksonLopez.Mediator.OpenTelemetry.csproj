@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>OpenTelemetry distributed tracing and metrics instrumentation for EricksonLopez.Mediator.</Description>
+    <PackageTags>$(CommonPackageTags);opentelemetry;observability;distributed-tracing;metrics;tracing</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Mediator\EricksonLopez.Mediator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Api" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EricksonLopez.Mediator.Tests" />
+    <InternalsVisibleTo Include="EricksonLopez.Mediator.OpenTelemetry.Tests" />
+  </ItemGroup>
+</Project>

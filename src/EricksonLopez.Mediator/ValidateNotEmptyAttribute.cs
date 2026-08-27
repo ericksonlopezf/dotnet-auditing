@@ -1,0 +1,25 @@
+// Copyright © Erickson Lopez. MIT License.
+using System;
+
+namespace EricksonLopez.Mediator;
+
+/// <summary>
+/// Validates that the decorated string, collection, or identifier is not empty.
+/// </summary>
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter)]
+public sealed class ValidateNotEmptyAttribute : Attribute
+{
+    /// <summary>
+    /// Gets or sets the custom error message returned when validation fails.
+    /// </summary>
+    public string? ErrorMessage { get; set; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ValidateNotEmptyAttribute"/> class.
+    /// </summary>
+    /// <param name="errorMessage">The optional custom error message returned when validation fails.</param>
+    public ValidateNotEmptyAttribute(string? errorMessage = null)
+    {
+        ErrorMessage = errorMessage;
+    }
+}

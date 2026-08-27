@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="EricksonLopez.Result" />
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EricksonLopez.Mediator\EricksonLopez.Mediator.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Mediator.AspNetCore\EricksonLopez.Mediator.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Mediator.FluentValidation\EricksonLopez.Mediator.FluentValidation.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Mediator.Result\EricksonLopez.Mediator.Result.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Mediator.Testing\EricksonLopez.Mediator.Testing.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Mediator.Generator\EricksonLopez.Mediator.Generator.csproj">
+      <OutputItemType>Analyzer</OutputItemType>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+</Project>

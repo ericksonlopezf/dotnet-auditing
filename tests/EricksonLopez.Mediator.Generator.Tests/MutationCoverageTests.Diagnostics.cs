@@ -1,0 +1,450 @@
+// Copyright © Erickson Lopez. MIT License.
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using AwesomeAssertions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Xunit;
+
+namespace EricksonLopez.Mediator.Generator.Tests;
+
+public partial class MutationCoverageTests
+{
+    [Fact]
+    public void ChainedNotificationBehaviors_GeneratesNestedNextStructs()
+    {
+        string source = @"
+using EricksonLopez.Mediator;
+
+namespace TestApp
+{
+    [UseBehavior(typeof(NotifBehavior1), 10)]
+    [UseBehavior(typeof(NotifBehavior2), 20)]
+    public class ChainedEvent : INotification { }
+
+    public class ChainedEventHandler : INotificationHandler<ChainedEvent>
+    {
+        public ValueTask Handle(ChainedEvent notification, CancellationToken ct) => default;
+    }
+
+    public class NotifBehavior1 : INotificationBehavior<ChainedEvent>
+    {
+        public ValueTask Handle<TNext>(ChainedEvent n, TNext next, CancellationToken ct) where TNext : struct, INotificationNext => next.InvokeAsync();
+    }
+    public class NotifBehavior2 : INotificationBehavior<ChainedEvent>
+    {
+        public ValueTask Handle<TNext>(ChainedEvent n, TNext next, CancellationToken ct) where TNext : struct, INotificationNext => next.InvokeAsync();
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        Assert.Contains("var b1 = _serviceProvider.GetRequiredService<global::TestApp.NotifBehavior2>();", dispatcherCode);
+        Assert.Contains("var next1 = new ChainedEventBehavior1Next(b1, handlerNext, n, cancellationToken);", dispatcherCode);
+        Assert.Contains("var b0 = _serviceProvider.GetRequiredService<global::TestApp.NotifBehavior1>();", dispatcherCode);
+        Assert.Contains("await b0.Handle(n, next1, cancellationToken).ConfigureAwait(false);", dispatcherCode);
+    }
+
+    [Fact]
+    public void SequentialNotification_GeneratesExceptionAggregation()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    [PublishStrategy(PublishStrategy.SequentialAggregateExceptions)]
+    public class SeqEvent : INotification { }
+    public class SeqHandler1 : INotificationHandler<SeqEvent>
+    {
+        public ValueTask Handle(SeqEvent notification, CancellationToken ct) => default;
+    }
+    public class SeqHandler2 : INotificationHandler<SeqEvent>
+    {
+        public ValueTask Handle(SeqEvent notification, CancellationToken ct) => default;
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        Assert.Contains("List<Exception> exceptions = null;", dispatcherCode);
+        Assert.Contains("try {", dispatcherCode);
+        Assert.Contains("exceptions.Add(ex);", dispatcherCode);
+        Assert.Contains("if (exceptions is not null) throw new global::EricksonLopez.Mediator.NotificationHandlerAggregateException(exceptions);", dispatcherCode);
+    }
+
+    [Fact]
+    public void NestedHandlerTypes_AreDiscoveredAndRegistered()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    public class OuterContainer
+    {
+        public class NestedCommand : ICommand<int> { }
+
+        public class NestedCommandHandler : ICommandHandler<NestedCommand, int>
+        {
+            public ValueTask<int> Handle(NestedCommand command, CancellationToken ct) => new(100);
+        }
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var diCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediatorExtensions.g.cs")).ToString();
+
+        Assert.Contains("services.AddTransient<global::TestApp.OuterContainer.NestedCommandHandler>();", diCode);
+    }
+
+    [Fact]
+    public void GeneratedCode_ContainsAutoGeneratedHeaderAndUsings()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    public class HeaderCommand : ICommand<int> { }
+    public class HeaderHandler : ICommandHandler<HeaderCommand, int>
+    {
+        public ValueTask<int> Handle(HeaderCommand command, CancellationToken ct) => new(1);
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        Assert.StartsWith("// <auto-generated/>", dispatcherCode.TrimStart());
+        Assert.Contains("using EricksonLopez.Mediator;", dispatcherCode);
+    }
+
+    [Fact]
+    public void BehaviorOrdering_SortsBehaviorsByAscendingOrder()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    [UseBehavior(typeof(Order20Behavior), 20)]
+    [UseBehavior(typeof(Order10Behavior), 10)]
+    public class OrderedCommand : ICommand<int> { }
+
+    public class OrderedCommandHandler : ICommandHandler<OrderedCommand, int>
+    {
+        public ValueTask<int> Handle(OrderedCommand command, CancellationToken ct) => new(1);
+    }
+
+    public class Order10Behavior : IPipelineBehavior<OrderedCommand, int>
+    {
+        public ValueTask<int> Handle<TNext>(OrderedCommand req, TNext next, CancellationToken ct) where TNext : struct, INext<int> => next.InvokeAsync();
+    }
+
+    public class Order20Behavior : IPipelineBehavior<OrderedCommand, int>
+    {
+        public ValueTask<int> Handle<TNext>(OrderedCommand req, TNext next, CancellationToken ct) where TNext : struct, INext<int> => next.InvokeAsync();
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        // Order10 is index 0 (outermost next1), Order20 is index 1 (inner next0)
+        Assert.Contains("var b0 = _serviceProvider.GetRequiredService<global::TestApp.Order10Behavior>();", dispatcherCode);
+        Assert.Contains("var b1 = _serviceProvider.GetRequiredService<global::TestApp.Order20Behavior>();", dispatcherCode);
+    }
+
+    [Fact]
+    public void ConstrainedGenericBehavior_AppliesOnlyWhenConstraintSatisfied()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    public interface IAuditable { }
+
+    [UseBehavior(typeof(AuditingBehavior<,>))]
+    public class AuditedCommand : ICommand<int>, IAuditable { }
+
+    public class AuditedHandler : ICommandHandler<AuditedCommand, int>
+    {
+        public ValueTask<int> Handle(AuditedCommand command, CancellationToken ct) => new(1);
+    }
+
+    [UseBehavior(typeof(AuditingBehavior<,>))]
+    public class NonAuditedCommand : ICommand<int> { }
+
+    public class NonAuditedHandler : ICommandHandler<NonAuditedCommand, int>
+    {
+        public ValueTask<int> Handle(NonAuditedCommand command, CancellationToken ct) => new(2);
+    }
+
+    public class AuditingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : IAuditable
+    {
+        public ValueTask<TResponse> Handle<TNext>(TRequest req, TNext next, CancellationToken ct)
+            where TNext : struct, INext<TResponse> => next.InvokeAsync();
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        // AuditedCommand has AuditingBehavior
+        Assert.Contains("AuditedCommandBehavior0Next", dispatcherCode);
+        // NonAuditedCommand does NOT have AuditingBehavior
+        Assert.DoesNotContain("NonAuditedCommandBehavior0Next", dispatcherCode);
+    }
+
+    [Fact]
+    public void BaseClassConstrainedBehavior_AppliesWhenBaseClassMatches()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    public abstract class BaseEntityCommand : ICommand<int> { }
+
+    [UseBehavior(typeof(EntityBehavior<,>))]
+    public class DerivedEntityCommand : BaseEntityCommand { }
+
+    public class DerivedEntityHandler : ICommandHandler<DerivedEntityCommand, int>
+    {
+        public ValueTask<int> Handle(DerivedEntityCommand command, CancellationToken ct) => new(1);
+    }
+
+    public class EntityBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+        where TRequest : BaseEntityCommand
+    {
+        public ValueTask<TResponse> Handle<TNext>(TRequest req, TNext next, CancellationToken ct)
+            where TNext : struct, INext<TResponse> => next.InvokeAsync();
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        Assert.Contains("DerivedEntityCommandBehavior0Next", dispatcherCode);
+    }
+
+    [Fact]
+    public void GlobalOpenGenericNotificationBehavior_AppliesToAllNotifications()
+    {
+        string source = @"
+
+[assembly: UseGlobalBehavior(typeof(TestApp.GlobalNotificationBehavior<>))]
+
+namespace TestApp
+{
+    public class GlobalEvent : INotification { }
+
+    public class GlobalEventHandler : INotificationHandler<GlobalEvent>
+    {
+        public ValueTask Handle(GlobalEvent notification, CancellationToken ct) => default;
+    }
+
+    public class GlobalNotificationBehavior<TNotification> : INotificationBehavior<TNotification>
+        where TNotification : INotification
+    {
+        public ValueTask Handle<TNext>(TNotification notification, TNext next, CancellationToken ct)
+            where TNext : struct, INotificationNext => next.InvokeAsync();
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        Assert.Contains("GlobalEventBehavior0Next", dispatcherCode);
+    }
+
+    [Fact]
+    public void ConstrainedNotificationBehavior_AppliesWhenConstraintMatches()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    public interface ILoggedEvent { }
+
+    [UseBehavior(typeof(LoggedNotifBehavior<>))]
+    public class LoggedNotif : INotification, ILoggedEvent { }
+
+    public class LoggedNotifHandler : INotificationHandler<LoggedNotif>
+    {
+        public ValueTask Handle(LoggedNotif notification, CancellationToken ct) => default;
+    }
+
+    [UseBehavior(typeof(LoggedNotifBehavior<>))]
+    public class UnloggedNotif : INotification { }
+
+    public class UnloggedNotifHandler : INotificationHandler<UnloggedNotif>
+    {
+        public ValueTask Handle(UnloggedNotif notification, CancellationToken ct) => default;
+    }
+
+    public class LoggedNotifBehavior<TNotification> : INotificationBehavior<TNotification>
+        where TNotification : ILoggedEvent
+    {
+        public ValueTask Handle<TNext>(TNotification n, TNext next, CancellationToken ct)
+            where TNext : struct, INotificationNext => next.InvokeAsync();
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        Assert.Contains("LoggedNotifBehavior0Next", dispatcherCode);
+        Assert.DoesNotContain("UnloggedNotifBehavior0Next", dispatcherCode);
+    }
+
+    [Fact]
+    public void StreamHandlerWithInvalidReturnType_ProducesELM011()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    public class StreamReq : IStreamRequest<int> { }
+
+    public class BadReturnStreamHandler : IStreamRequestHandler<StreamReq, int>
+    {
+        // Returns Task instead of IAsyncEnumerable
+        public async Task<int> Handle(StreamReq req, CancellationToken ct) => await Task.FromResult(42);
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out var diagnostics);
+        Assert.Contains(diagnostics, d => d.Id == "ELM011");
+    }
+
+    [Fact]
+    public void PipelineStructs_HaveExactNextTypeFields()
+    {
+        string source = @"
+
+namespace TestApp
+{
+    [UseBehavior(typeof(BehaviorA), 10)]
+    [UseBehavior(typeof(BehaviorB), 20)]
+    [UseBehavior(typeof(BehaviorC), 30)]
+    public class MultiBehaviorCommand : ICommand<int> { }
+
+    public class MultiBehaviorHandler : ICommandHandler<MultiBehaviorCommand, int>
+    {
+        public ValueTask<int> Handle(MultiBehaviorCommand command, CancellationToken ct) => new(1);
+    }
+
+    public class BehaviorA : IPipelineBehavior<MultiBehaviorCommand, int>
+    {
+        public ValueTask<int> Handle<TNext>(MultiBehaviorCommand req, TNext next, CancellationToken ct) where TNext : struct, INext<int> => next.InvokeAsync();
+    }
+    public class BehaviorB : IPipelineBehavior<MultiBehaviorCommand, int>
+    {
+        public ValueTask<int> Handle<TNext>(MultiBehaviorCommand req, TNext next, CancellationToken ct) where TNext : struct, INext<int> => next.InvokeAsync();
+    }
+    public class BehaviorC : IPipelineBehavior<MultiBehaviorCommand, int>
+    {
+        public ValueTask<int> Handle<TNext>(MultiBehaviorCommand req, TNext next, CancellationToken ct) where TNext : struct, INext<int> => next.InvokeAsync();
+    }
+
+    [UseBehavior(typeof(NotifBehaviorA), 10)]
+    [UseBehavior(typeof(NotifBehaviorB), 20)]
+    public class MultiBehaviorEvent : INotification { }
+
+    public class MultiBehaviorEventHandler : INotificationHandler<MultiBehaviorEvent>
+    {
+        public ValueTask Handle(MultiBehaviorEvent n, CancellationToken ct) => default;
+    }
+
+    public class NotifBehaviorA : INotificationBehavior<MultiBehaviorEvent>
+    {
+        public ValueTask Handle<TNext>(MultiBehaviorEvent n, TNext next, CancellationToken ct) where TNext : struct, INotificationNext => next.InvokeAsync();
+    }
+    public class NotifBehaviorB : INotificationBehavior<MultiBehaviorEvent>
+    {
+        public ValueTask Handle<TNext>(MultiBehaviorEvent n, TNext next, CancellationToken ct) where TNext : struct, INotificationNext => next.InvokeAsync();
+    }
+}";
+        var compilation = CreateCompilation(source);
+        var generator = new MediatorSourceGenerator();
+        var driver = CSharpGeneratorDriver.Create(generator);
+
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out var outComp, out var diagnostics);
+        Assert.Empty(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var dispatcherCode = outComp.SyntaxTrees
+            .First(t => t.FilePath.Contains("GeneratedMediator.g.cs")).ToString();
+
+        // Exact struct fields for request behaviors
+        Assert.Contains("private readonly MultiBehaviorCommandBehavior1Next _next;", dispatcherCode);
+        Assert.Contains("private readonly MultiBehaviorCommandBehavior2Next _next;", dispatcherCode);
+        Assert.Contains("private readonly MultiBehaviorCommandHandlerNext _next;", dispatcherCode);
+
+        // Exact struct fields for notification behaviors
+        Assert.Contains("private readonly MultiBehaviorEventBehavior1Next _next;", dispatcherCode);
+        Assert.Contains("private readonly MultiBehaviorEventNotificationNext _next;", dispatcherCode);
+    }
+}
+
+
+

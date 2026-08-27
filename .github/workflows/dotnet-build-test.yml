@@ -1,0 +1,170 @@
+name: Reusable — .NET Build & Test
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-version:
+        description: ".NET SDK version to use"
+        required: false
+        type: string
+        default: "10.0.x"
+      test-filter:
+        description: "Test filter expression (e.g., Category!=Integration)"
+        required: false
+        type: string
+        default: ""
+      test-project:
+        description: "Specific test project path (leave empty to run all)"
+        required: false
+        type: string
+        default: ""
+      upload-coverage:
+        description: "Whether to upload code coverage artifacts"
+        required: false
+        type: boolean
+        default: true
+      artifact-name:
+        description: "Name for the test results artifact"
+        required: false
+        type: string
+        default: "test-results"
+    secrets:
+      SNK_KEY:
+        description: "Base64-encoded Strong Name key (.snk) for assembly signing"
+        required: false
+      CODECOV_TOKEN:
+        description: "Codecov upload token for coverage reporting"
+        required: false
+      SONAR_TOKEN:
+        description: "SonarCloud token for analysis"
+        required: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+
+      - name: Restore Strong Name key
+        env:
+          SNK_KEY: ${{ secrets.SNK_KEY }}
+        run: |
+          if [ -n "$SNK_KEY" ]; then
+            echo "$SNK_KEY" | tr -d '\n\r ' | base64 --decode > EricksonLopez.snk
+          fi
+
+      - name: Restore
+        run: dotnet restore EricksonLopez.Mediator.slnx
+
+      - name: Verify Code Formatting
+        run: dotnet format --verify-no-changes
+
+      - name: Verify License Headers
+        run: |
+          missing=0
+          for f in $(git ls-files 'src/*.cs' 'tests/*.cs'); do
+            if ! head -n 1 "$f" | grep -q "// Copyright © Erickson Lopez. MIT License."; then
+              echo "Missing license header: $f"
+              missing=$((missing + 1))
+            fi
+          done
+          if [ $missing -gt 0 ]; then
+            echo "::error::$missing files missing required license header"
+            exit 1
+          fi
+
+      - name: Verify Kebab-Case Documentation Naming
+        run: |
+          invalid=0
+          for f in $(git ls-files 'docs/*.md' 'docs/**/*.md'); do
+            base=$(basename "$f")
+            if [[ ! "$base" =~ ^[a-z0-9]+(-[a-z0-9]+)*\.md$ ]]; then
+              echo "Non-kebab-case doc file found: $f"
+              invalid=$((invalid + 1))
+            fi
+          done
+          if [ $invalid -gt 0 ]; then
+            echo "::error::$invalid documentation files violate kebab-case naming"
+            exit 1
+          fi
+
+      - name: Setup Java (for SonarScanner)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+
+      - name: Install SonarScanner
+        run: dotnet tool install --global dotnet-sonarscanner
+
+      - name: Begin Sonar Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: env.SONAR_TOKEN != ''
+        run: |
+          dotnet sonarscanner begin \
+            /k:"ericksonlopezf_${{ github.event.repository.name }}" \
+            /o:"ericksonlopezf" \
+            /d:sonar.token="$SONAR_TOKEN" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.cs.opencover.reportsPaths="**/test-results/**/coverage.opencover.xml,**/TestResults/**/coverage.opencover.xml,**/coverage.opencover.xml" \
+            /d:sonar.coverage.exclusions="**/tests/**,**/benchmarks/**,**/samples/**,**/*.g.cs,**/bin/**,**/obj/**,scripts/**" \
+            /d:sonar.exclusions="**/bin/**,**/obj/**,**/artifacts/**,**/coveragereport*/**,**/StrykerOutput/**,scripts/**,samples/**,benchmarks/**"
+
+      - name: Build (Release)
+        run: dotnet build EricksonLopez.Mediator.slnx --no-restore --configuration Release
+
+      - name: Run tests
+        run: >
+          dotnet test
+          EricksonLopez.Mediator.slnx
+          ${{ inputs.test-project }}
+          --no-build
+          --configuration Release
+          ${{ inputs.test-filter != '' && format('--filter "{0}"', inputs.test-filter) || '' }}
+          --verbosity normal
+          --logger "trx"
+          --results-directory ./test-results
+          --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
+
+      - name: Verify Package Creation
+        run: dotnet pack EricksonLopez.Mediator.slnx --no-build --configuration Release
+
+      - name: End Sonar Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: always() && env.SONAR_TOKEN != ''
+        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ./test-results/
+
+      - name: Upload coverage to Codecov
+        if: always() && inputs.upload-coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: "**/coverage.opencover.xml,**/coverage.cobertura.xml"
+          fail_ci_if_error: false
+          flags: unittests
+          name: codecov-${{ inputs.artifact-name }}

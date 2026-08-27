@@ -1,0 +1,18 @@
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject Condition="'$(MSBuildProjectName)' != 'EricksonLopez.Mediator.AotSmokeTest'">true</IsTestProject>
+    <IsTestProject Condition="'$(MSBuildProjectName)' == 'EricksonLopez.Mediator.AotSmokeTest'">false</IsTestProject>
+    <EnableTrimAnalyzer Condition="'$(PublishAot)' != 'true'">false</EnableTrimAnalyzer>
+    <IsAotCompatible Condition="'$(PublishAot)' != 'true'">false</IsAotCompatible>
+    <NoWarn>$(NoWarn);CA1822;CA1861;IL2026;IL3000;IL3050;CA2208;CA1310;CA2211;CA1805;CA1860;CA1859;CA2263;CA2012</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('xunit.runner.json')">
+    <Content Include="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

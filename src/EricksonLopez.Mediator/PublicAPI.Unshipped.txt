@@ -1,0 +1,102 @@
+#nullable enable
+EricksonLopez.Mediator.HandlerLifetime
+EricksonLopez.Mediator.HandlerLifetime.Scoped = 1 -> EricksonLopez.Mediator.HandlerLifetime
+EricksonLopez.Mediator.HandlerLifetime.Singleton = 0 -> EricksonLopez.Mediator.HandlerLifetime
+EricksonLopez.Mediator.HandlerLifetime.Transient = 2 -> EricksonLopez.Mediator.HandlerLifetime
+EricksonLopez.Mediator.ICommand<TResponse>
+EricksonLopez.Mediator.ICommandHandler<TCommand, TResponse>
+EricksonLopez.Mediator.ICommandHandler<TCommand, TResponse>.Handle(TCommand command, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.IMediator
+EricksonLopez.Mediator.INext
+EricksonLopez.Mediator.INext.InvokeAsync() -> System.Threading.Tasks.ValueTask
+EricksonLopez.Mediator.INext<TResponse>
+EricksonLopez.Mediator.INext<TResponse>.InvokeAsync() -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.INotification
+EricksonLopez.Mediator.INotificationBehavior<TNotification>
+EricksonLopez.Mediator.INotificationBehavior<TNotification>.Handle<TNext>(TNotification notification, TNext next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+EricksonLopez.Mediator.INotificationHandler<TNotification>
+EricksonLopez.Mediator.INotificationHandler<TNotification>.Handle(TNotification notification, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+EricksonLopez.Mediator.IPipelineBehavior<TRequest, TResponse>
+EricksonLopez.Mediator.IPipelineBehavior<TRequest, TResponse>.Handle<TNext>(TRequest request, TNext next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.IPublisher
+EricksonLopez.Mediator.IPublisher.Publish<TNotification>(TNotification notification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+EricksonLopez.Mediator.IQuery<TResponse>
+EricksonLopez.Mediator.IQueryHandler<TQuery, TResponse>
+EricksonLopez.Mediator.IQueryHandler<TQuery, TResponse>.Handle(TQuery query, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.ISender
+EricksonLopez.Mediator.ISender.Send<TResponse>(EricksonLopez.Mediator.ICommand<TResponse>! command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.ISender.SendCommand<TCommand, TResponse>(TCommand command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.ISender.Send<TResponse>(EricksonLopez.Mediator.IQuery<TResponse>! query, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.ISender.SendQuery<TQuery, TResponse>(TQuery query, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.MediatorValidationException
+EricksonLopez.Mediator.MediatorValidationException.Errors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+EricksonLopez.Mediator.MediatorValidationException.MediatorValidationException(string! message) -> void
+EricksonLopez.Mediator.MediatorValidationException.MediatorValidationException(System.Collections.Generic.IReadOnlyList<string!>! errors) -> void
+EricksonLopez.Mediator.NotificationHandlerAggregateException
+EricksonLopez.Mediator.NotificationHandlerAggregateException.HandlerExceptions.get -> System.Collections.Generic.IReadOnlyList<System.Exception!>!
+EricksonLopez.Mediator.NotificationHandlerAggregateException.NotificationHandlerAggregateException(System.Collections.Generic.IReadOnlyList<System.Exception!>! exceptions) -> void
+EricksonLopez.Mediator.PublishStrategy
+EricksonLopez.Mediator.PublishStrategy.Parallel = 1 -> EricksonLopez.Mediator.PublishStrategy
+EricksonLopez.Mediator.PublishStrategy.Sequential = 0 -> EricksonLopez.Mediator.PublishStrategy
+EricksonLopez.Mediator.PublishStrategy.SequentialAggregateExceptions = 2 -> EricksonLopez.Mediator.PublishStrategy
+EricksonLopez.Mediator.PublishStrategyAttribute
+EricksonLopez.Mediator.PublishStrategyAttribute.PublishStrategyAttribute(EricksonLopez.Mediator.PublishStrategy strategy) -> void
+EricksonLopez.Mediator.PublishStrategyAttribute.Strategy.get -> EricksonLopez.Mediator.PublishStrategy
+EricksonLopez.Mediator.ServiceLifetimeAttribute
+EricksonLopez.Mediator.ServiceLifetimeAttribute.Lifetime.get -> EricksonLopez.Mediator.HandlerLifetime
+EricksonLopez.Mediator.ServiceLifetimeAttribute.ServiceLifetimeAttribute(EricksonLopez.Mediator.HandlerLifetime lifetime) -> void
+EricksonLopez.Mediator.StaticMediator
+static EricksonLopez.Mediator.StaticMediator.Publish<TNotification>(TNotification notification, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+static EricksonLopez.Mediator.StaticMediator.RegisterCommandHandler<TCommand, TResponse>(EricksonLopez.Mediator.ICommandHandler<TCommand, TResponse>! handler) -> void
+static EricksonLopez.Mediator.StaticMediator.RegisterNotificationHandler<TNotification>(EricksonLopez.Mediator.INotificationHandler<TNotification>! handler) -> void
+static EricksonLopez.Mediator.StaticMediator.RegisterQueryHandler<TQuery, TResponse>(EricksonLopez.Mediator.IQueryHandler<TQuery, TResponse>! handler) -> void
+static EricksonLopez.Mediator.StaticMediator.Reset() -> void
+static EricksonLopez.Mediator.StaticMediator.SendCommand<TCommand, TResponse>(TCommand command, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TResponse>
+static EricksonLopez.Mediator.StaticMediator.SendQuery<TQuery, TResponse>(TQuery query, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TResponse>
+EricksonLopez.Mediator.UseBehaviorAttribute
+EricksonLopez.Mediator.UseBehaviorAttribute.BehaviorType.get -> System.Type!
+EricksonLopez.Mediator.UseBehaviorAttribute.Order.get -> int
+EricksonLopez.Mediator.UseBehaviorAttribute.UseBehaviorAttribute(System.Type! behaviorType, int order = 0) -> void
+EricksonLopez.Mediator.UseGlobalBehaviorAttribute
+EricksonLopez.Mediator.UseGlobalBehaviorAttribute.BehaviorType.get -> System.Type!
+EricksonLopez.Mediator.UseGlobalBehaviorAttribute.Order.get -> int
+EricksonLopez.Mediator.UseGlobalBehaviorAttribute.UseGlobalBehaviorAttribute(System.Type! behaviorType, int order = 0) -> void
+EricksonLopez.Mediator.ValidateLengthAttribute
+EricksonLopez.Mediator.ValidateLengthAttribute.ErrorMessage.get -> string?
+EricksonLopez.Mediator.ValidateLengthAttribute.ErrorMessage.set -> void
+EricksonLopez.Mediator.ValidateLengthAttribute.MaximumLength.get -> int
+EricksonLopez.Mediator.ValidateLengthAttribute.MinimumLength.get -> int
+EricksonLopez.Mediator.ValidateLengthAttribute.ValidateLengthAttribute(int minimumLength, int maximumLength, string? errorMessage = null) -> void
+EricksonLopez.Mediator.ValidateNotEmptyAttribute
+EricksonLopez.Mediator.ValidateNotEmptyAttribute.ErrorMessage.get -> string?
+EricksonLopez.Mediator.ValidateNotEmptyAttribute.ErrorMessage.set -> void
+EricksonLopez.Mediator.ValidateNotEmptyAttribute.ValidateNotEmptyAttribute(string? errorMessage = null) -> void
+EricksonLopez.Mediator.ValidateNotNullAttribute
+EricksonLopez.Mediator.ValidateNotNullAttribute.ErrorMessage.get -> string?
+EricksonLopez.Mediator.ValidateNotNullAttribute.ErrorMessage.set -> void
+EricksonLopez.Mediator.ValidateNotNullAttribute.ValidateNotNullAttribute(string? errorMessage = null) -> void
+EricksonLopez.Mediator.ValidateRangeAttribute
+EricksonLopez.Mediator.ValidateRangeAttribute.ErrorMessage.get -> string?
+EricksonLopez.Mediator.ValidateRangeAttribute.ErrorMessage.set -> void
+EricksonLopez.Mediator.ValidateRangeAttribute.Maximum.get -> double
+EricksonLopez.Mediator.ValidateRangeAttribute.Minimum.get -> double
+EricksonLopez.Mediator.ValidateRangeAttribute.ValidateRangeAttribute(double minimum, double maximum, string? errorMessage = null) -> void
+EricksonLopez.Mediator.ValidateRegexAttribute
+EricksonLopez.Mediator.ValidateRegexAttribute.ErrorMessage.get -> string?
+EricksonLopez.Mediator.ValidateRegexAttribute.ErrorMessage.set -> void
+EricksonLopez.Mediator.ValidateRegexAttribute.Pattern.get -> string!
+EricksonLopez.Mediator.ValidateRegexAttribute.ValidateRegexAttribute(string! pattern, string? errorMessage = null) -> void
+EricksonLopez.Mediator.ValidateRequestAttribute
+EricksonLopez.Mediator.ValidateRequestAttribute.ValidateRequestAttribute() -> void
+EricksonLopez.Mediator.DiscoverHandlersAttribute
+EricksonLopez.Mediator.DiscoverHandlersAttribute.AssemblyMarkerType.get -> System.Type!
+EricksonLopez.Mediator.DiscoverHandlersAttribute.DiscoverHandlersAttribute(System.Type! assemblyMarkerType) -> void
+EricksonLopez.Mediator.IStreamRequest<TResponse>
+EricksonLopez.Mediator.IStreamRequestHandler<TRequest, TResponse>
+EricksonLopez.Mediator.IStreamRequestHandler<TRequest, TResponse>.Handle(TRequest request, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<TResponse>!
+EricksonLopez.Mediator.ISender.CreateStream<TResponse>(EricksonLopez.Mediator.IStreamRequest<TResponse>! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<TResponse>!
+EricksonLopez.Mediator.HealthChecks.MediatorHealthCheck
+EricksonLopez.Mediator.HealthChecks.MediatorHealthCheck.CheckHealthAsync(Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult>
+EricksonLopez.Mediator.HealthChecks.MediatorHealthCheck.MediatorHealthCheck(EricksonLopez.Mediator.ISender? sender = null) -> void
+EricksonLopez.Mediator.MediatorHealthCheckExtensions
+EricksonLopez.Mediator.MediatorHealthCheckExtensions.AddMediatorHealthCheck(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

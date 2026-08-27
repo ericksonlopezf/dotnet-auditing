@@ -1,0 +1,32 @@
+<Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/EricksonLopez.Mediator.Benchmarks/EricksonLopez.Mediator.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/EricksonLopez.Mediator.Samples/EricksonLopez.Mediator.Samples.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/EricksonLopez.Mediator.Generator/EricksonLopez.Mediator.Generator.csproj" />
+    <Project Path="src/EricksonLopez.Mediator/EricksonLopez.Mediator.csproj" />
+    <Project Path="src/EricksonLopez.Mediator.OpenTelemetry/EricksonLopez.Mediator.OpenTelemetry.csproj" />
+    <Project Path="src/EricksonLopez.Mediator.Polly/EricksonLopez.Mediator.Polly.csproj" />
+    <Project Path="src/EricksonLopez.Mediator.Result/EricksonLopez.Mediator.Result.csproj" />
+    <Project Path="src/EricksonLopez.Mediator.Testing/EricksonLopez.Mediator.Testing.csproj" />
+    <Project Path="src/EricksonLopez.Mediator.FluentValidation/EricksonLopez.Mediator.FluentValidation.csproj" />
+    <Project Path="src/EricksonLopez.Mediator.AspNetCore/EricksonLopez.Mediator.AspNetCore.csproj" />
+    <Project Path="src/EricksonLopez.Mediator.RateLimiting/EricksonLopez.Mediator.RateLimiting.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EricksonLopez.Mediator.AotSmokeTest/EricksonLopez.Mediator.AotSmokeTest.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.AspNetCore.Tests/EricksonLopez.Mediator.AspNetCore.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.FluentValidation.Tests/EricksonLopez.Mediator.FluentValidation.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.Generator.Tests/EricksonLopez.Mediator.Generator.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.IntegrationTests/EricksonLopez.Mediator.IntegrationTests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.OpenTelemetry.Tests/EricksonLopez.Mediator.OpenTelemetry.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.Polly.Tests/EricksonLopez.Mediator.Polly.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.RateLimiting.Tests/EricksonLopez.Mediator.RateLimiting.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.Result.Tests/EricksonLopez.Mediator.Result.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.Testing.Tests/EricksonLopez.Mediator.Testing.Tests.csproj" />
+    <Project Path="tests/EricksonLopez.Mediator.Tests/EricksonLopez.Mediator.Tests.csproj" />
+  </Folder>
+</Solution>

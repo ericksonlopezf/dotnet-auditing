@@ -1,0 +1,20 @@
+{
+  "stryker-config": {
+    "project": "EricksonLopez.Mediator.AspNetCore.csproj",
+    "concurrency": 2,
+    "thresholds": {
+      "high": 100,
+      "low": 98,
+      "break": 95
+    },
+    "reporters": [
+      "html",
+      "json",
+      "cleartext",
+      "progress"
+    ],
+    "ignore-methods": [
+      "ConfigureAwait"
+    ]
+  }
+}

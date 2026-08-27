@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <Description>Result pattern integration and pipeline short-circuiting abstractions for EricksonLopez.Mediator.</Description>
+    <PackageTags>$(CommonPackageTags);result-pattern;railway-oriented-programming;functional-programming;error-handling;short-circuiting;native-aot</PackageTags>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Mediator\EricksonLopez.Mediator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EricksonLopez.Result" />
+  </ItemGroup>
+
+</Project>

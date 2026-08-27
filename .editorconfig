@@ -1,0 +1,70 @@
+# Top-most EditorConfig file
+root = true
+
+# Global settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Standard C# formatting and conventions
+[*.cs]
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+# Naming rules - PascalCase for methods in production code
+dotnet_naming_rule.methods_must_be_pascal_case.symbols = method_symbols
+dotnet_naming_rule.methods_must_be_pascal_case.style = pascal_case_style
+dotnet_naming_rule.methods_must_be_pascal_case.severity = warning
+
+dotnet_naming_symbols.method_symbols.applicable_kinds = method
+dotnet_naming_symbols.method_symbols.applicable_accessibilities = *
+
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+
+# ─── Mandatory Analyzer Diagnostics Configuration ──────────────────────────────
+# Quality, Style, and Invariants Enforcement across the Solution
+dotnet_diagnostic.IDE1006.severity = warning
+dotnet_diagnostic.CA1707.severity = warning
+dotnet_diagnostic.CA1852.severity = warning
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CS0618.severity = error
+dotnet_diagnostic.CS0619.severity = error
+dotnet_diagnostic.xUnit1051.severity = suggestion
+dotnet_diagnostic.CS1591.severity = warning
+dotnet_diagnostic.CS159.severity = error
+
+# ─── Test Specifications Configuration ──────────────────────────────────────────
+# ADR-031: Unit and integration tests are living executable specifications.
+# Method names follow the Osherove pattern (Method_Scenario_Result) with underscores.
+# Disable IDE1006 and CA1707 exclusively in test files and test projects.
+[tests/**/*.cs]
+dotnet_diagnostic.IDE1006.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1852.severity = none
+dotnet_diagnostic.CA1305.severity = none
+
+[**/*Tests.cs]
+dotnet_diagnostic.IDE1006.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1852.severity = none
+dotnet_diagnostic.CA1305.severity = none
+
+[**/*Test.cs]
+dotnet_diagnostic.IDE1006.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1852.severity = none
+dotnet_diagnostic.CA1305.severity = none
+
+# ─── Samples and Showcase Configuration ──────────────────────────────────────────
+[samples/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1852.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CS1591.severity = none
+
+[*.cs]
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false

@@ -1,0 +1,33 @@
+{
+  "stryker-config": {
+    "project": "EricksonLopez.Mediator.Testing.csproj",
+    "test-projects": [
+      "EricksonLopez.Mediator.Testing.Tests.csproj"
+    ],
+    "mutate": [
+      "**/*.cs",
+      "!bin/**",
+      "!obj/**",
+      "!**/*.g.cs",
+      "!**/*.AssemblyInfo.cs"
+    ],
+    "concurrency": 2,
+    "coverage-analysis": "off",
+    "thresholds": {
+      "high": 100,
+      "low": 98,
+      "break": 95
+    },
+    "reporters": [
+      "html",
+      "json",
+      "cleartext",
+      "progress"
+    ],
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose"
+    ]
+  }
+}
+
