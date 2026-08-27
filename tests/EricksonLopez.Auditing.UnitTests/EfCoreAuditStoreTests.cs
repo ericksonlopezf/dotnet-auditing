@@ -15,6 +15,10 @@ namespace EricksonLopez.Auditing.UnitTests;
 
 public sealed class EfCoreAuditStoreTests
 {
+    private static readonly string[] _indexPropTenantOccurredId = new[] { "TenantId", "OccurredAt", "Id" };
+    private static readonly string[] _indexPropTenantCorr = new[] { "TenantId", "CorrelationId" };
+    private static readonly string[] _indexPropTenantResource = new[] { "TenantId", "ResourceType", "ResourceId" };
+
     private static IDbContextFactory<AuditDbContext> CreateFactory(string dbName)
     {
         var services = new ServiceCollection();
@@ -417,9 +421,9 @@ public sealed class EfCoreAuditStoreTests
         prev.IsNullable.Should().BeTrue();
 
         var indexes = entityType.GetIndexes().ToList();
-        indexes.Should().Contain(i => i.Properties.Select(p => p.Name).SequenceEqual(IndexPropTenantOccurredId));
-        indexes.Should().Contain(i => i.Properties.Select(p => p.Name).SequenceEqual(IndexPropTenantCorr));
-        indexes.Should().Contain(i => i.Properties.Select(p => p.Name).SequenceEqual(IndexPropTenantResource));
+        indexes.Should().Contain(i => i.Properties.Select(p => p.Name).SequenceEqual(_indexPropTenantOccurredId));
+        indexes.Should().Contain(i => i.Properties.Select(p => p.Name).SequenceEqual(_indexPropTenantCorr));
+        indexes.Should().Contain(i => i.Properties.Select(p => p.Name).SequenceEqual(_indexPropTenantResource));
     }
 
     [Fact]

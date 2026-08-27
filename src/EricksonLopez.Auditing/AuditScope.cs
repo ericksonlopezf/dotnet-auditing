@@ -51,7 +51,7 @@ public sealed class AuditScope : IDisposable
         }
 
         var scope = new AuditScope(parent, metadata);
-        s_current.Value = scope;
+        _current.Value = scope;
         return scope;
     }
 
