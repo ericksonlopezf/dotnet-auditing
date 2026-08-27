@@ -1,0 +1,34 @@
+## Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+## Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+[Tt]emp/
+TestResults/
+coveragereport/
+coveragereport_html/
+StrykerOutput/
+all-summaries/
+test-results/
+nupkgs/
+
+## Certificates & Secrets
+*.pfx
+*.key
+
+## Temporary & Scratch
+TestOracle/
+hash_test.cs
+generate_tests.csx
+*.trx
+*.opencover.xml
+*.cobertura.xml

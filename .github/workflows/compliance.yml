@@ -1,0 +1,23 @@
+# Copyright © Erickson Lopez. MIT License.
+name: Repository Compliance & Quality Gate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  compliance-gate:
+    name: Compliance & Architecture Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify Solution Compliance
+        run: node scripts/verify-solution-compliance.js

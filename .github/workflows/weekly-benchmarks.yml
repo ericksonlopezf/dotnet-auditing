@@ -1,0 +1,126 @@
+# Copyright © Erickson Lopez. MIT License.
+name: Weekly Benchmarks (Deep Review)
+
+# ─── Purpose ─────────────────────────────────────────────────────────────────
+# Runs a deep BenchmarkDotNet review across multiple frameworks (.NET 9 and 10)
+# every week. This runs the Default Job configuration (not 'short') to get 
+# statistically rigorous results without blocking the developer's day-to-day PRs.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    # Runs every Sunday at 2:00 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      benchmark-filter:
+        description: "BenchmarkDotNet filter glob (e.g. '*Pipeline*', '*' for all)"
+        required: false
+        default: "*"
+        type: string
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  benchmark:
+    name: Weekly Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET (multi-version for cross-TFM benchmarks)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore EricksonLopez.Auditing.slnx
+
+      - name: Build (Release)
+        run: dotnet build EricksonLopez.Auditing.slnx --no-restore --configuration Release
+
+      # ─── Run BenchmarkDotNet for each supported target framework ─────────
+      # Full statistically rigorous measurement (Default Job)
+      - name: Run benchmarks (.NET 8.0)
+        run: >
+          dotnet run
+          --project benchmarks/EricksonLopez.Auditing.Benchmarks/EricksonLopez.Auditing.Benchmarks.csproj
+          --configuration Release
+          --framework net8.0
+          --
+          --filter "${{ inputs.benchmark-filter || '*' }}"
+          --exporters json markdown
+          --artifacts ./benchmarks/results/net8.0
+
+      - name: Run benchmarks (.NET 9.0)
+        run: >
+          dotnet run
+          --project benchmarks/EricksonLopez.Auditing.Benchmarks/EricksonLopez.Auditing.Benchmarks.csproj
+          --configuration Release
+          --framework net9.0
+          --
+          --filter "${{ inputs.benchmark-filter || '*' }}"
+          --exporters json markdown
+          --artifacts ./benchmarks/results/net9.0
+
+      - name: Run benchmarks (.NET 10.0)
+        run: >
+          dotnet run
+          --project benchmarks/EricksonLopez.Auditing.Benchmarks/EricksonLopez.Auditing.Benchmarks.csproj
+          --configuration Release
+          --framework net10.0
+          --
+          --filter "${{ inputs.benchmark-filter || '*' }}"
+          --exporters json markdown
+          --artifacts ./benchmarks/results/net10.0
+
+      - name: Upload benchmark results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-benchmark-results-${{ github.run_id }}
+          path: benchmarks/results/
+          retention-days: 90
+
+      # ─── Commit results back to the branch ───────────────────────────────
+      - name: Commit benchmark results
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p benchmarks/results
+          git add -A benchmarks/results/
+          if git diff --staged --quiet; then
+            echo "No benchmark result changes to commit."
+          else
+            git commit -m "chore(benchmarks): update weekly performance baseline [skip ci]
+
+          Run: ${{ github.run_id }}
+          Trigger: Weekly Schedule
+          Runtimes: .NET 8.0, .NET 9.0, .NET 10.0 (Deep Review)
+          "
+            git push
+          fi
+
+      - name: Post benchmark summary to Step Summary
+        if: always()
+        run: |
+          FOUND=0
+          for SUMMARY in $(find benchmarks/results -name "*.md" 2>/dev/null | sort); do
+            echo "## $(basename $SUMMARY)" >> "$GITHUB_STEP_SUMMARY"
+            cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            FOUND=1
+          done
+          if [ $FOUND -eq 0 ]; then
+            echo "### ⚠️ No benchmark markdown results found" >> "$GITHUB_STEP_SUMMARY"
+          fi

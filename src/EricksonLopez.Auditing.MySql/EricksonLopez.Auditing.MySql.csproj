@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Description>MySQL and MariaDB adapter for EricksonLopez.Auditing. Uses MySqlConnector for high-performance, async-first, AOT-compatible append-only audit persistence.</Description>
+    <PackageTags>$(CommonPackageTags);mysql;mariadb;mysqlconnector;dapper;multi-tenant;native-aot</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="MySqlConnector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Auditing.Abstractions\EricksonLopez.Auditing.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

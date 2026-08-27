@@ -1,0 +1,33 @@
+# Code Owners for EricksonLopez.Auditing
+
+# Default owners for everything in the repository
+* @ericksonlopezf
+
+# Build, CPM and CI/CD pipelines
+Directory.Build.props @ericksonlopezf
+Directory.Packages.props @ericksonlopezf
+.github/ @ericksonlopezf
+
+# Core and Abstractions
+/src/EricksonLopez.Auditing.Abstractions/ @ericksonlopezf
+/src/EricksonLopez.Auditing/ @ericksonlopezf
+/src/EricksonLopez.Auditing.Testing/ @ericksonlopezf
+
+# Database and ORM Adapters
+/src/EricksonLopez.Auditing.PostgreSql/ @ericksonlopezf
+/src/EricksonLopez.Auditing.SqlServer/ @ericksonlopezf
+/src/EricksonLopez.Auditing.MySql/ @ericksonlopezf
+/src/EricksonLopez.Auditing.Oracle/ @ericksonlopezf
+/src/EricksonLopez.Auditing.Sqlite/ @ericksonlopezf
+/src/EricksonLopez.Auditing.Dapper/ @ericksonlopezf
+/src/EricksonLopez.Auditing.EntityFrameworkCore/ @ericksonlopezf
+/src/EricksonLopez.Auditing.MongoDb/ @ericksonlopezf
+
+# Observability
+/src/EricksonLopez.Auditing.OpenTelemetry/ @ericksonlopezf
+
+# Tests, Benchmarks, Samples, and Documentation
+/tests/ @ericksonlopezf
+/benchmarks/ @ericksonlopezf
+/samples/ @ericksonlopezf
+/docs/ @ericksonlopezf
