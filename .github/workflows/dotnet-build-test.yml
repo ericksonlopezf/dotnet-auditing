@@ -108,8 +108,7 @@ jobs:
       - name: Run tests
         run: >
           dotnet test
-          EricksonLopez.Auditing.slnx
-          ${{ inputs.test-project }}
+          ${{ inputs.test-project != '' && inputs.test-project || 'EricksonLopez.Auditing.slnx' }}
           --no-build
           --configuration Release
           ${{ inputs.test-filter != '' && format('--filter "{0}"', inputs.test-filter) || '' }}
