@@ -97,7 +97,7 @@ jobs:
       # ─── Full test suite before publish ──────────────────────────────────────
       - name: Run tests before publish
         run: |
-          dotnet test EricksonLopez.Auditing.slnx \
+          dotnet test tests/EricksonLopez.Auditing.UnitTests/EricksonLopez.Auditing.UnitTests.csproj \
             --no-build \
             --configuration Release \
             --logger "trx" \

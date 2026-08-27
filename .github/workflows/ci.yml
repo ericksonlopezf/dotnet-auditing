@@ -12,6 +12,7 @@ jobs:
     uses: ./.github/workflows/dotnet-build-test.yml
     with:
       artifact-name: test-results
+      test-project: tests/EricksonLopez.Auditing.UnitTests/EricksonLopez.Auditing.UnitTests.csproj
     secrets:
       SNK_KEY: ${{ secrets.SNK_KEY }}
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
