@@ -26,6 +26,7 @@ public static class AuditDbContextModelBuilderExtensions
             b.Property(e => e.ActorName).HasMaxLength(256);
             b.Property(e => e.CorrelationId).HasMaxLength(128);
             b.Property(e => e.CausationId).HasMaxLength(128);
+            b.Property(e => e.IdempotencyKey).HasMaxLength(128);
             b.Property(e => e.ErrorCode).HasMaxLength(128);
             b.Property(e => e.IntegrityHash).HasMaxLength(256);
             b.Property(e => e.PreviousHash).HasMaxLength(256);

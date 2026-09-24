@@ -19,7 +19,7 @@ namespace EricksonLopez.Auditing.Sqlite.Tests;
 public sealed class SqliteUnitTests
 {
     private static HmacAuditIntegrityService CreateHmacService() =>
-        new(new TestAuditIntegrityProvider());
+        new(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
 
     private static SqliteAuditStore CreateStore(FakeDbConnection connection, string? table = null)
     {
@@ -265,7 +265,7 @@ public sealed class SqliteUnitTests
             From = fromDate,
             To = toDate,
             CorrelationId = "corr-xyz",
-            AfterRecordId = cursorId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId),
             PageSize = 25
         };
 
@@ -273,7 +273,7 @@ public sealed class SqliteUnitTests
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
 
         conn.ExecutedCommands.Should().HaveCount(1);
         var cmd = conn.ExecutedCommands[0];
@@ -287,7 +287,7 @@ public sealed class SqliteUnitTests
         cmd.CommandText.Should().Contain("resource_id = @ResourceId");
         cmd.CommandText.Should().Contain("outcome = @Outcome");
         cmd.CommandText.Should().Contain("correlation_id = @CorrelationId");
-        cmd.CommandText.Should().Contain("occurred_at > (SELECT occurred_at FROM audit_records WHERE id = @CursorId)");
+        cmd.CommandText.Should().Contain("occurred_at > @CursorDate");
         cmd.CommandText.Should().Contain("LIMIT 26");
 
         cmd.Parameters["TenantId"].Value.Should().Be("tenant-a");
@@ -322,7 +322,9 @@ public sealed class SqliteUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeTrue();
-        result.NextCursorId.Should().Be(r2.Id);
+        result.NextPageToken.Should().NotBeNull();
+        EricksonLopez.Auditing.AuditCursorToken.TryParse(result.NextPageToken, out _, out var parsedId).Should().BeTrue();
+        parsedId.Should().Be(r2.Id);
     }
 
     [Fact]
@@ -360,7 +362,7 @@ public sealed class SqliteUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
         result.Records[0].Changes.Should().NotBeNull();
         result.Records[0].Changes!.Count.Should().Be(1);
         result.Records[0].Changes![0].Field.Should().Be("Field1");
@@ -372,6 +374,7 @@ public sealed class SqliteUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
 
@@ -545,6 +548,7 @@ public sealed class SqliteUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
         builder.UseSqlite(options =>
@@ -628,7 +632,7 @@ public sealed class SqliteUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -639,7 +643,7 @@ public sealed class SqliteUnitTests
 
         var store = CreateStore(conn);
         var cursorId = Guid.NewGuid();
-        await store.QueryAsync(new AuditQuery { TenantId = "tenant-cursor", AfterRecordId = cursorId, PageSize = 10 });
+        await store.QueryAsync(new AuditQuery { TenantId = "tenant-cursor", ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId), PageSize = 10 });
 
         conn.ExecutedCommands.Should().HaveCount(1);
         conn.ExecutedCommands[0].Parameters["CursorId"].Value.Should().Be(cursorId.ToString());
@@ -820,3 +824,7 @@ public sealed class SqliteUnitTests
         verOpenRes.IsValid.Should().BeTrue();
     }
 }
+
+
+
+

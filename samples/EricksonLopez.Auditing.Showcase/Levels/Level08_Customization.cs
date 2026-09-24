@@ -9,113 +9,113 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EricksonLopez.Auditing.Showcase.Levels;
 
 /// <summary>
-/// Custom Actor Provider based on Identity Claims.
-/// Reference implementation of IAuditActorProvider for web apps with JWT.
-/// </summary>
-public sealed class ShowcaseClaimsAuditActorProvider : IAuditActorProvider
-{
-    private readonly string _simulatedUserId;
-    private readonly string _simulatedDisplayName;
-
-    public ShowcaseClaimsAuditActorProvider()
-    {
-        _simulatedUserId = "usr-jwt-claims-1049";
-        _simulatedDisplayName = "Carol Smith (SecOps Admin)";
-    }
-
-    public AuditActor GetCurrentActor()
-    {
-        // In a real web application, extracted from IHttpContextAccessor -> HttpContext.User
-        return new AuditActor(AuditActorType.User, _simulatedUserId, _simulatedDisplayName);
-    }
-}
-
-/// <summary>
-/// Custom Audit Context Provider.
-/// Reference implementation of IAuditContextProvider for ambient enrichment
-/// of TenantId, CorrelationId, and Source from execution context.
-/// </summary>
-public sealed class ShowcaseAmbientContextProvider : IAuditContextProvider
-{
-    private readonly string _tenantId;
-    private readonly string _source;
-    private readonly string? _correlationId;
-
-    public ShowcaseAmbientContextProvider(string tenantId, string source, string? correlationId = null)
-    {
-        _tenantId = tenantId;
-        _source = source;
-        _correlationId = correlationId;
-    }
-
-    public AuditContext GetCurrentContext() =>
-        new AuditContext(
-            TenantId: _tenantId,
-            Source: _source,
-            CorrelationId: _correlationId);
-}
-
-/// <summary>
-/// HMAC Cryptographic Key Provider simulating a Key Management System (AWS KMS / Azure Key Vault).
-/// </summary>
-public sealed class ShowcaseKmsAuditIntegrityProvider : IAuditIntegrityProvider
-{
-    // 32-byte (256-bit) key for HMAC-SHA256
-    private static readonly byte[] _masterKmsKey = new byte[]
-    {
-        0x1A, 0x2B, 0x3C, 0x4D, 0x5E, 0x6F, 0x70, 0x81,
-        0x92, 0xA3, 0xB4, 0xC5, 0xD6, 0xE7, 0xF8, 0x09,
-        0x10, 0x21, 0x32, 0x43, 0x54, 0x65, 0x76, 0x87,
-        0x98, 0xA9, 0xBA, 0xCB, 0xDC, 0xED, 0xFE, 0x0F
-    };
-
-    public ReadOnlyMemory<byte> GetCurrentKey(string tenantId)
-    {
-        // In production: derive or fetch tenant-specific key from KMS
-        return _masterKmsKey;
-    }
-}
-
-/// <summary>
-/// Custom IAuditStore Implementation for SIEM / Security Logging.
-/// </summary>
-public sealed class ShowcaseSiemAuditStore : IAuditStore
-{
-    private readonly List<AuditRecord> _siemBuffer = new();
-
-    public ValueTask AppendAsync(AuditRecord record, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(record);
-        _siemBuffer.Add(record);
-        Console.WriteLine($"   [SIEM FORWARDER] » Event emitted: {record.Action.Code} by {record.Actor.DisplayName} ({record.Actor.Id})");
-        return ValueTask.CompletedTask;
-    }
-
-    public ValueTask AppendBatchAsync(IReadOnlyList<AuditRecord> records, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(records);
-        foreach (var r in records)
-        {
-            _siemBuffer.Add(r);
-        }
-        Console.WriteLine($"   [SIEM FORWARDER] » Batch of {records.Count} events emitted to SIEM.");
-        return ValueTask.CompletedTask;
-    }
-
-    public ValueTask<AuditQueryResult> QueryAsync(AuditQuery query, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        return ValueTask.FromResult(new AuditQueryResult(_siemBuffer, null, false));
-    }
-}
-
-/// <summary>
 /// Level 8 — Customization: Replacing Public Components & Dependency Injection.
 /// Demonstrates IAuditActorProvider, IAuditContextProvider, IAuditIntegrityProvider,
 /// IAuditStore, SystemAuditActorProvider, and IAuditBuilder.
 /// </summary>
 public static class Level08_Customization
 {
+    /// <summary>
+    /// Custom Actor Provider based on Identity Claims.
+    /// Reference implementation of IAuditActorProvider for web apps with JWT.
+    /// </summary>
+    public sealed class ShowcaseClaimsAuditActorProvider : IAuditActorProvider
+    {
+        private readonly string _simulatedUserId;
+        private readonly string _simulatedDisplayName;
+
+        public ShowcaseClaimsAuditActorProvider()
+        {
+            _simulatedUserId = "usr-jwt-claims-1049";
+            _simulatedDisplayName = "Carol Smith (SecOps Admin)";
+        }
+
+        public AuditActor GetCurrentActor()
+        {
+            // In a real web application, extracted from IHttpContextAccessor -> HttpContext.User
+            return new AuditActor(AuditActorType.User, _simulatedUserId, _simulatedDisplayName);
+        }
+    }
+
+    /// <summary>
+    /// Custom Audit Context Provider.
+    /// Reference implementation of IAuditContextProvider for ambient enrichment
+    /// of TenantId, CorrelationId, and Source from execution context.
+    /// </summary>
+    public sealed class ShowcaseAmbientContextProvider : IAuditContextProvider
+    {
+        private readonly string _tenantId;
+        private readonly string _source;
+        private readonly string? _correlationId;
+
+        public ShowcaseAmbientContextProvider(string tenantId, string source, string? correlationId = null)
+        {
+            _tenantId = tenantId;
+            _source = source;
+            _correlationId = correlationId;
+        }
+
+        public AuditContext GetCurrentContext() =>
+            new AuditContext(
+                TenantId: _tenantId,
+                Source: _source,
+                CorrelationId: _correlationId);
+    }
+
+    /// <summary>
+    /// HMAC Cryptographic Key Provider simulating a Key Management System (AWS KMS / Azure Key Vault).
+    /// </summary>
+    public sealed class ShowcaseKmsAuditIntegrityProvider : IAuditIntegrityProvider
+    {
+        // 32-byte (256-bit) key for HMAC-SHA256
+        private static readonly byte[] _masterKmsKey = new byte[]
+        {
+            0x1A, 0x2B, 0x3C, 0x4D, 0x5E, 0x6F, 0x70, 0x81,
+            0x92, 0xA3, 0xB4, 0xC5, 0xD6, 0xE7, 0xF8, 0x09,
+            0x10, 0x21, 0x32, 0x43, 0x54, 0x65, 0x76, 0x87,
+            0x98, 0xA9, 0xBA, 0xCB, 0xDC, 0xED, 0xFE, 0x0F
+        };
+
+        public ReadOnlyMemory<byte> GetCurrentKey(TenantId tenantId)
+        {
+            // In production: derive or fetch tenant-specific key from KMS
+            return _masterKmsKey;
+        }
+    }
+
+    /// <summary>
+    /// Custom IAuditStore Implementation for SIEM / Security Logging.
+    /// </summary>
+    public sealed class ShowcaseSiemAuditStore : IAuditStore
+    {
+        private readonly List<AuditRecord> _siemBuffer = new();
+
+        public ValueTask AppendAsync(AuditRecord record, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(record);
+            _siemBuffer.Add(record);
+            Console.WriteLine($"   [SIEM FORWARDER] » Event emitted: {record.Action.Code} by {record.Actor.DisplayName} ({record.Actor.Id})");
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask AppendBatchAsync(IReadOnlyList<AuditRecord> records, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(records);
+            foreach (var r in records)
+            {
+                _siemBuffer.Add(r);
+            }
+            Console.WriteLine($"   [SIEM FORWARDER] » Batch of {records.Count} events emitted to SIEM.");
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<AuditQueryResult> QueryAsync(AuditQuery query, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(query);
+            return ValueTask.FromResult(new AuditQueryResult(_siemBuffer, null, false));
+        }
+    }
+
     public static async Task RunAsync()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
@@ -209,3 +209,4 @@ public static class Level08_Customization
         Console.WriteLine($"\n✓ Complete Flow: Resolved Actor → Ambient Context → HMAC Signature → SIEM Persistence.\n");
     }
 }
+

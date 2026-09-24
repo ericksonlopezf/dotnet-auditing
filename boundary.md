@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Architectural Boundary Specification: EricksonLopez.Auditing
 
 ## 1. Purpose

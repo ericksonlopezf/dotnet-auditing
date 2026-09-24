@@ -17,7 +17,7 @@ namespace EricksonLopez.Auditing.Oracle.Tests;
 
 public sealed class OracleUnitTests
 {
-    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider());
+    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
 
     [Fact]
     public void Options_DefaultValues()
@@ -56,6 +56,7 @@ public sealed class OracleUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
 
@@ -132,7 +133,7 @@ public sealed class OracleUnitTests
 
         await store.AppendAsync(record);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(2);
+        fakeConn.ExecutedCommands.Should().HaveCount(3);
 
         var vpdCmd = fakeConn.ExecutedCommands[0];
         vpdCmd.CommandText.Should().Contain("DBMS_SESSION.SET_IDENTIFIER");
@@ -218,7 +219,7 @@ public sealed class OracleUnitTests
 
         await store.AppendBatchAsync(records);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(3);
+        fakeConn.ExecutedCommands.Should().HaveCount(4);
         fakeConn.ExecutedCommands[0].CommandText.Should().Contain("DBMS_SESSION.SET_IDENTIFIER");
         fakeConn.ExecutedCommands[1].CommandText.Should().Contain("INSERT INTO AUDIT_USER.AUDIT_RECORDS");
         fakeConn.ExecutedCommands[2].CommandText.Should().Contain("INSERT INTO AUDIT_USER.AUDIT_RECORDS");
@@ -265,13 +266,13 @@ public sealed class OracleUnitTests
             ResourceId = "doc-99",
             Outcome = AuditOutcome.Failure,
             CorrelationId = "corr-555",
-            AfterRecordId = cursorId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId),
             PageSize = 50
         };
 
         var result = await store.QueryAsync(query);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(2);
+        fakeConn.ExecutedCommands.Should().HaveCount(3);
 
         var vpdCmd = fakeConn.ExecutedCommands[0];
         vpdCmd.CommandText.Should().Contain("DBMS_SESSION.SET_IDENTIFIER");
@@ -300,11 +301,11 @@ public sealed class OracleUnitTests
         queryCmd.Parameters["ResourceId"].Value.Should().Be("doc-99");
         queryCmd.Parameters["Outcome"].Value.Should().Be((byte)AuditOutcome.Failure);
         queryCmd.Parameters["CorrelationId"].Value.Should().Be("corr-555");
-        queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId.ToString());
+        queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId.ToString("N").ToUpperInvariant());
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -400,7 +401,7 @@ public sealed class OracleUnitTests
 
         queryResult.Records.Should().HaveCount(2);
         queryResult.HasMore.Should().BeTrue();
-        queryResult.NextCursorId.Should().Be(r2Id);
+        EricksonLopez.Auditing.AuditCursorToken.TryParse(queryResult.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(r2Id);
 
         var first = queryResult.Records[0];
         first.Id.Should().Be(r1Id);
@@ -494,12 +495,12 @@ public sealed class OracleUnitTests
         {
             TenantId = "tenant-cursor",
             From = fromDate,
-            AfterRecordId = cursorId
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId)
         });
 
         var queryCmd = fakeConn.ExecutedCommands[1];
-        queryCmd.CommandText.Should().Contain("(\"OCCURRED_AT\" > (SELECT \"OCCURRED_AT\" FROM AUDIT_USER.AUDIT_RECORDS WHERE \"ID\" = :CursorId)");
-        queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId.ToString("D"));
+        queryCmd.CommandText.Should().Contain("(\"OCCURRED_AT\" > TO_TIMESTAMP(:CursorDate");
+        queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId.ToString("N").ToUpperInvariant());
     }
 
     [Fact]
@@ -592,7 +593,7 @@ public sealed class OracleUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -715,3 +716,8 @@ public sealed class OracleUnitTests
         fakeConn.ExecutedCommands.Should().NotContain(c => c.CommandText.Contains(".AUDIT_RECORDS"));
     }
 }
+
+
+
+
+

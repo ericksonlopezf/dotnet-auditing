@@ -64,7 +64,7 @@ public static class Level07_Scalability
         Console.WriteLine("   │ Page │ Records Read     │ Last Record ID (Cursor)              │ HasMore │");
         Console.WriteLine("   ├──────┼──────────────────┼──────────────────────────────────────┼─────────┤");
 
-        Guid? cursor = null;
+        string? cursor = null;
         int pageNumber = 1;
 
         while (true)
@@ -73,19 +73,19 @@ public static class Level07_Scalability
             {
                 TenantId = tenantId,
                 PageSize = pageSize,
-                AfterRecordId = cursor
+                ContinuationToken = cursor
             };
 
             var result = await store.QueryAsync(query);
 
-            Console.WriteLine($"   │ {pageNumber,4} │ {result.Records.Count,16} │ {result.NextCursorId?.ToString() ?? "null",-36} │ {result.HasMore,-7} │");
+            Console.WriteLine($"   │ {pageNumber,4} │ {result.Records.Count,16} │ {result.NextPageToken?.ToString() ?? "null",-36} │ {result.HasMore,-7} │");
 
-            if (!result.HasMore || result.NextCursorId is null)
+            if (!result.HasMore || result.NextPageToken is null)
             {
                 break;
             }
 
-            cursor = result.NextCursorId;
+            cursor = result.NextPageToken;
             pageNumber++;
         }
         Console.WriteLine("   └──────┴──────────────────┴──────────────────────────────────────┴─────────┘\n");

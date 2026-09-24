@@ -19,7 +19,7 @@ public sealed class AuditRecordModelTests
         record.Actor.Should().NotBeNull();
         record.Action.Code.Should().NotBeNullOrEmpty();
         record.Resource.Should().NotBeNull();
-        record.Context.TenantId.Should().Be("tenant-a");
+        record.Context.TenantId.Value.Should().Be("tenant-a");
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public sealed class AuditRecordModelTests
     [Fact]
     public void AuditContext_SystemTenant_HasReservedConstant()
     {
-        AuditContext.SystemTenantId.Should().Be("system");
+        AuditContext.SystemTenantId.Value.Should().Be("system");
     }
 
     [Fact]
@@ -148,12 +148,17 @@ public sealed class AuditRecordModelTests
     [Fact]
     public void AuditQueryResult_PropertiesAreCorrect()
     {
-        var nextCursor = Guid.NewGuid();
+        var id = Guid.NewGuid();
+        var nextCursor = AuditCursorToken.Create(DateTimeOffset.UtcNow, id);
         var records = new List<AuditRecord> { AuditRecordBuilder.BuildDefault() };
         var result = new AuditQueryResult(records, nextCursor, true);
 
         result.Records.Should().HaveCount(1);
-        result.NextCursorId.Should().Be(nextCursor);
+        result.NextPageToken.Should().NotBeNull(); EricksonLopez.Auditing.AuditCursorToken.TryParse(result.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(id);
         result.HasMore.Should().BeTrue();
     }
 }
+
+
+
+

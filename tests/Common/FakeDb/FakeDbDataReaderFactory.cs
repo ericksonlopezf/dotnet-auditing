@@ -8,13 +8,6 @@ using EricksonLopez.Auditing;
 
 namespace EricksonLopez.Auditing.Tests.Common;
 
-[JsonSerializable(typeof(List<FakeChangeDto>))]
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-[ExcludeFromCodeCoverage]
-internal sealed partial class FakeDbJsonContext : JsonSerializerContext { }
-
-internal sealed record FakeChangeDto(string Field, string? OldValue, string? NewValue, bool IsRedacted);
-
 [ExcludeFromCodeCoverage]
 internal static class FakeDbDataReaderFactory
 {
@@ -129,3 +122,6 @@ internal static class FakeDbDataReaderFactory
         return JsonSerializer.Serialize(dtos, FakeDbJsonContext.Default.ListFakeChangeDto);
     }
 }
+
+
+

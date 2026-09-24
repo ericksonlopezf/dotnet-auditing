@@ -3,13 +3,14 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 
 namespace EricksonLopez.Auditing.SqlServer;
 
-/// <summary>Verifies the cryptographic HMAC chain for audit records stored in Microsoft SQL Server.</summary>
+/// <summary>Provides cryptographic HMAC chain verification for audit records stored in SQL Server.</summary>
 public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
 {
     private readonly SqlServerAuditStoreOptions _options;
@@ -28,6 +29,7 @@ public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
     }
 
     /// <inheritdoc/>
+    /// <exception cref="ArgumentException"><paramref name="tenantId"/> is <see langword="null"/> or empty</exception>
     [SuppressMessage("Security", "S2077:Use a parameterized query instead of string formatting.", Justification = "Schema and table names are configured identifiers that cannot be parameterized in SQL.")]
     public async ValueTask<AuditIntegrityVerificationResult> VerifyChainAsync(
         string tenantId,
@@ -38,11 +40,13 @@ public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
         ArgumentException.ThrowIfNullOrEmpty(tenantId);
 
         using var connection = _options.ConnectionFactory();
-        if (connection.State != ConnectionState.Open) connection.Open();
+        await OpenConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
 
-        await connection.ExecuteAsync(
+        var rlsCmd = new CommandDefinition(
             "EXEC sp_set_session_context @key=N'TenantId', @value=@TenantId, @read_only=0;",
-            new { TenantId = tenantId });
+            new { TenantId = tenantId },
+            cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(rlsCmd).ConfigureAwait(false);
 
         var sql = $"""
             SELECT [id] AS [Id], [occurred_at] AS [OccurredAt], [tenant_id] AS [TenantId], [source] AS [Source],
@@ -51,6 +55,7 @@ public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
                    [resource_type] AS [ResourceType], [resource_id] AS [ResourceId], [aggregate_type] AS [AggregateType], [aggregate_id] AS [AggregateId],
                    [outcome] AS [Outcome], [error_code] AS [ErrorCode],
                    [correlation_id] AS [CorrelationId], [causation_id] AS [CausationId], [request_id] AS [RequestId], [ip_address] AS [IpAddress], [user_agent] AS [UserAgent],
+                   [changes] AS [ChangesJson],
                    [integrity_hash] AS [IntegrityHash], [previous_hash] AS [PreviousHash]
             FROM [{_options.Schema}].[{_options.Table}]
             WHERE [tenant_id] = @TenantId
@@ -59,12 +64,14 @@ public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
             ORDER BY [occurred_at] ASC, [id] ASC;
             """;
 
-        var rows = await connection.QueryAsync<IntegrityRow>(sql, new
+        var queryCmd = new CommandDefinition(sql, new
         {
             TenantId = tenantId,
             From = from.UtcDateTime,
             To = until.UtcDateTime
-        });
+        }, cancellationToken: cancellationToken);
+
+        var rows = await connection.QueryAsync<IntegrityRow>(queryCmd).ConfigureAwait(false);
 
         int count = 0;
         string? expectedPreviousHash = null;
@@ -73,6 +80,8 @@ public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
         {
             cancellationToken.ThrowIfCancellationRequested();
             count++;
+
+            var changes = ParseChanges(row.ChangesJson);
 
             var record = new AuditRecord
             {
@@ -83,6 +92,7 @@ public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
                 Resource = new AuditResource(row.ResourceType, row.ResourceId, row.AggregateType, row.AggregateId),
                 Outcome = (AuditOutcome)row.Outcome,
                 ErrorCode = row.ErrorCode,
+                Changes = changes,
                 Context = new AuditContext(
                     TenantId: row.TenantId,
                     Source: row.Source,
@@ -119,6 +129,40 @@ public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
         return new AuditIntegrityVerificationResult(IsValid: true, VerifiedCount: count);
     }
 
+    private static List<AuditChange>? ParseChanges(string? changesJson)
+    {
+        if (string.IsNullOrWhiteSpace(changesJson))
+            return null;
+
+        var dtos = JsonSerializer.Deserialize(changesJson, AuditJsonContext.Default.ListAuditChangeDto);
+        if (dtos is not { Count: > 0 })
+            return null;
+
+        var list = new List<AuditChange>(dtos.Count);
+        for (int i = 0; i < dtos.Count; i++)
+        {
+            var d = dtos[i];
+            list.Add(d.IsRedacted
+                ? AuditChange.Redacted(d.Field)
+                : new AuditChange(d.Field, d.OldValue, d.NewValue));
+        }
+
+        return list;
+    }
+
+    private static async Task OpenConnectionAsync(IDbConnection connection, CancellationToken cancellationToken)
+    {
+        if (connection is System.Data.Common.DbConnection dbConn)
+        {
+            if (dbConn.State != ConnectionState.Open)
+                await dbConn.OpenAsync(cancellationToken).ConfigureAwait(false);
+        }
+        else if (connection.State != ConnectionState.Open)
+        {
+            connection.Open();
+        }
+    }
+
     [SuppressMessage("Minor Code Smell", "S3459:Unassigned auto-property", Justification = "Instantiated and mapped dynamically by Dapper.")]
     [SuppressMessage("Major Code Smell", "S1144:Unused private types or members", Justification = "Instantiated and mapped dynamically by Dapper.")]
     private sealed class IntegrityRow
@@ -142,6 +186,7 @@ public sealed class SqlServerAuditIntegrityVerifier : IAuditIntegrityVerifier
         public string? RequestId { get; set; }
         public string? IpAddress { get; set; }
         public string? UserAgent { get; set; }
+        public string? ChangesJson { get; set; }
         public string? IntegrityHash { get; set; }
         public string? PreviousHash { get; set; }
     }

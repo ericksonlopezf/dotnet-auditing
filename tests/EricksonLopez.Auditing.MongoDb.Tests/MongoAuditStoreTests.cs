@@ -229,7 +229,7 @@ public sealed class MongoAuditStoreTests
         var store = new MongoAuditStore(collection);
 
         var act = async () => await store.QueryAsync(new AuditQuery { TenantId = tenantId! });
-        await act.Should().ThrowAsync<ArgumentException>().WithParameterName("query.TenantId");
+        await act.Should().ThrowAsync<ArgumentException>().WithParameterName("value");
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public sealed class MongoAuditStoreTests
             From = fromDate,
             To = toDate,
             CorrelationId = "corr-1",
-            AfterRecordId = afterId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, afterId),
             PageSize = 25
         };
 
@@ -276,8 +276,8 @@ public sealed class MongoAuditStoreTests
         var bson = RenderFilter(capturedFilter);
         var json = bson.ToJson();
 
-        // Must NOT contain $or (proves & was used, not |=)
-        json.Should().NotContain("$or");
+        // Keyset pagination uses $or to implement (Date > CursorDate) OR (Date == CursorDate AND Id > CursorId)
+        json.Should().Contain("$or");
 
         // Verify all fields are present in the filter
         json.Should().Contain("tenantId");
@@ -450,14 +450,14 @@ public sealed class MongoAuditStoreTests
         var afterId = Guid.NewGuid();
 
         // When set
-        await store.QueryAsync(new AuditQuery { TenantId = "t1", AfterRecordId = afterId });
+        await store.QueryAsync(new AuditQuery { TenantId = "t1", ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, afterId) });
         var jsonSet = RenderFilter(capturedFilter).ToJson();
         jsonSet.Should().Contain("_id");
         jsonSet.Should().Contain("$gt");
-        jsonSet.Should().NotContain("$or");
+        jsonSet.Should().Contain("$or");
 
         // When null
-        await store.QueryAsync(new AuditQuery { TenantId = "t1", AfterRecordId = null });
+        await store.QueryAsync(new AuditQuery { TenantId = "t1", ContinuationToken = null });
         var jsonNull = RenderFilter(capturedFilter).ToJson();
         jsonNull.Should().NotContain("_id");
     }
@@ -486,7 +486,7 @@ public sealed class MongoAuditStoreTests
 
         result.Records.Should().HaveCount(3);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -514,7 +514,7 @@ public sealed class MongoAuditStoreTests
 
         result.Records.Should().HaveCount(3);
         result.HasMore.Should().BeTrue();
-        result.NextCursorId.Should().Be(doc3.Id);
+        result.NextPageToken.Should().NotBeNull(); EricksonLopez.Auditing.AuditCursorToken.TryParse(result.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(doc3.Id);
     }
 
     [Fact]
@@ -583,7 +583,7 @@ public sealed class MongoAuditStoreTests
 
         var r1 = result.Records[0];
         r1.Id.Should().Be(docWithChanges.Id);
-        r1.Context.TenantId.Should().Be("tenant-map");
+        r1.Context.TenantId.Value.Should().Be("tenant-map");
         r1.Context.Source.Should().Be("App");
         r1.Actor.Type.Should().Be(AuditActorType.User);
         r1.Actor.Id.Should().Be("user-1");
@@ -710,3 +710,7 @@ public sealed class MongoAuditStoreTests
         act2.Should().Throw<ArgumentNullException>().WithParameterName("databaseFactory");
     }
 }
+
+
+
+

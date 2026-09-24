@@ -1,4 +1,11 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # ADR-0002: Monotonic Time-Ordered Identifiers via RFC 9562 UUIDv7
+
+## Status
+Accepted
+
+## Date
+2026-09-04
 
 ## Context
 

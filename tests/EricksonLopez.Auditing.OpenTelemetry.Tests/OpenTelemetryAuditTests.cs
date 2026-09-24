@@ -16,7 +16,7 @@ public sealed class OpenTelemetryAuditTests
     {
         AuditActivitySource.ActivitySourceName.Should().Be("EricksonLopez.Auditing");
         AuditActivitySource.Source.Name.Should().Be("EricksonLopez.Auditing");
-        AuditActivitySource.Source.Version.Should().Be("1.0.0");
+        AuditActivitySource.Source.Version.Should().Be("2.0.0");
     }
 
     [Fact]
@@ -41,19 +41,19 @@ public sealed class OpenTelemetryAuditTests
         AuditMetrics.RecordsAppended.Name.Should().Be("audit.records_appended");
         AuditMetrics.RecordsAppended.Description.Should().Be("Number of audit records successfully persisted.");
         AuditMetrics.RecordsAppended.Meter.Name.Should().Be("EricksonLopez.Auditing");
-        AuditMetrics.RecordsAppended.Meter.Version.Should().Be("1.0.0");
+        AuditMetrics.RecordsAppended.Meter.Version.Should().Be("2.0.0");
 
         AuditMetrics.QueriesExecuted.Should().NotBeNull();
         AuditMetrics.QueriesExecuted.Name.Should().Be("audit.queries_executed");
         AuditMetrics.QueriesExecuted.Description.Should().Be("Number of audit query operations executed.");
         AuditMetrics.QueriesExecuted.Meter.Name.Should().Be("EricksonLopez.Auditing");
-        AuditMetrics.QueriesExecuted.Meter.Version.Should().Be("1.0.0");
+        AuditMetrics.QueriesExecuted.Meter.Version.Should().Be("2.0.0");
 
         AuditMetrics.IntegrityVerifications.Should().NotBeNull();
         AuditMetrics.IntegrityVerifications.Name.Should().Be("audit.integrity_verifications");
         AuditMetrics.IntegrityVerifications.Description.Should().Be("Number of cryptographic audit integrity chain verifications performed.");
         AuditMetrics.IntegrityVerifications.Meter.Name.Should().Be("EricksonLopez.Auditing");
-        AuditMetrics.IntegrityVerifications.Meter.Version.Should().Be("1.0.0");
+        AuditMetrics.IntegrityVerifications.Meter.Version.Should().Be("2.0.0");
 
         // Record metrics to verify functional execution of counters
         AuditMetrics.RecordsAppended.Add(1);
@@ -140,3 +140,6 @@ public sealed class OpenTelemetryAuditTests
         act.Should().NotThrow();
     }
 }
+
+
+

@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Frequently Asked Questions (FAQ)
 
 Answers to common questions regarding the architecture, operation, and security of `EricksonLopez.Auditing`.

@@ -17,7 +17,7 @@ namespace EricksonLopez.Auditing.PostgreSql.Tests;
 
 public sealed class PostgreSqlUnitTests
 {
-    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider());
+    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
 
     [Fact]
     public void Options_DefaultValues()
@@ -56,6 +56,7 @@ public sealed class PostgreSqlUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
 
@@ -267,7 +268,7 @@ public sealed class PostgreSqlUnitTests
             ResourceId = "doc-99",
             Outcome = AuditOutcome.Failure,
             CorrelationId = "corr-555",
-            AfterRecordId = cursorId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId),
             PageSize = 50
         };
 
@@ -304,7 +305,7 @@ public sealed class PostgreSqlUnitTests
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -400,7 +401,7 @@ public sealed class PostgreSqlUnitTests
 
         queryResult.Records.Should().HaveCount(2);
         queryResult.HasMore.Should().BeTrue();
-        queryResult.NextCursorId.Should().Be(r2Id);
+        EricksonLopez.Auditing.AuditCursorToken.TryParse(queryResult.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(r2Id);
 
         var first = queryResult.Records[0];
         first.Id.Should().Be(r1Id);
@@ -494,12 +495,12 @@ public sealed class PostgreSqlUnitTests
         {
             TenantId = "tenant-cursor",
             From = fromDate,
-            AfterRecordId = cursorId
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId)
         });
 
         var queryCmd = fakeConn.ExecutedCommands[1];
         queryCmd.CommandText.Should().Contain("(occurred_at, id) > (");
-        queryCmd.CommandText.Should().Contain("WHERE id = @CursorId");
+        queryCmd.CommandText.Should().Contain("(@CursorDate, @CursorId)");
         queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId);
     }
 
@@ -593,7 +594,7 @@ public sealed class PostgreSqlUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -679,3 +680,8 @@ public sealed class PostgreSqlUnitTests
         await storeOpen.AppendAsync(r);
     }
 }
+
+
+
+
+

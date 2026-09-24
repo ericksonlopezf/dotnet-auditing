@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Performance & Optimization Guide: EricksonLopez.Auditing
 
 Techniques and best practices to maximize throughput, minimize database I/O, and maintain high scalability in production.
@@ -29,7 +30,7 @@ WHERE tenant_id = 'acme' AND (occurred_at, id) < (@LastOccurredAt, @LastId)
 ORDER BY occurred_at DESC, id DESC LIMIT 20;
 ```
 
-**Rule:** Use `AuditQuery.AfterRecordId` to seek directly to the next cursor without table scans.
+**Rule:** Use `AuditQuery.ContinuationToken` (set to the `NextPageToken` of the previous result) to seek directly to the next cursor without table scans.
 
 ---
 

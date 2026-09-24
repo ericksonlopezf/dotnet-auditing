@@ -38,7 +38,7 @@ public static class Level10_EnterpriseArchitecture
             new("EmailHash", null, AuditSensitivityPipeline.HashValue("alice@enterprise.com")) // SHA-256
         };
 
-        var sanitizedChanges = sensitivityPipeline.Apply(rawChanges);
+        var sanitizedChanges = await sensitivityPipeline.ApplyAsync(rawChanges, "tenant-1");
 
         Console.WriteLine($"   • Original Changes:  {rawChanges.Count} fields");
         Console.WriteLine($"   • Sanitized Changes: {sanitizedChanges?.Count ?? 0} fields\n");
@@ -119,7 +119,7 @@ public static class Level10_EnterpriseArchitecture
 
         // ── 4. Cryptographic HMAC-SHA256 Chaining & Tamper Detection ─────────────
         Console.WriteLine("── 4. Cryptographic HMAC-SHA256 Chaining (Audit Hash Chain) ──");
-        var hmacService = new HmacAuditIntegrityService(testProvider);
+        var hmacService = new HmacAuditIntegrityService(testProvider, new HmacSha256AuditHashAlgorithm());
         const string tenantId = "tenant-compliance-vault";
 
         // Record 1 (Genesis)
@@ -178,6 +178,64 @@ public static class Level10_EnterpriseArchitecture
         Console.WriteLine("  • OracleAuditIntegrityVerifier   (IAuditIntegrityVerifier)\n");
         Console.ResetColor();
 
-        await Task.CompletedTask;
+        // ── 6. GDPR Article 17 Crypto-Shredding (IAuditCryptoKeyProvider) ─────────
+        Console.WriteLine("── 6. GDPR Art. 17 Crypto-Shredding (IAuditCryptoKeyProvider) ──");
+        var cryptoProvider = new ShowcaseCryptoKeyProvider();
+        const string dataSubjectId = "usr-gdpr-customer-99";
+
+        var encKey = await cryptoProvider.GetEncryptionKeyAsync(dataSubjectId);
+        Console.WriteLine($"✓ Generated 256-bit AES key for subject '{dataSubjectId}' ({encKey.Length * 8} bits).");
+
+        // Simulate shredding key
+        await cryptoProvider.ShredKeyAsync(dataSubjectId);
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"✓ ShredKeyAsync(\"{dataSubjectId}\") executed — Subject key permanently destroyed from KMS.");
+        Console.ResetColor();
+
+        try
+        {
+            await cryptoProvider.GetEncryptionKeyAsync(dataSubjectId);
+            Console.WriteLine("✗ Key was not shredded!");
+        }
+        catch (KeyNotFoundException)
+        {
+            Console.WriteLine("✓ Post-Shred Verification: KeyNotFoundException thrown. Subject PII is mathematically irrecoverable (Crypto-Shredded).\n");
+        }
+
+        // ── 7. Cloud KMS Integration: Azure Key Vault (IAuditIntegrityProvider) ───
+        Console.WriteLine("── 7. Cloud Key Management (EricksonLopez.Auditing.AzureKeyVault) ──");
+        Console.WriteLine("   AzureKeyVaultIntegrityProvider retrieves cryptographic tenant keys from Azure Key Vault secrets.");
+        Console.WriteLine("   • Type: EricksonLopez.Auditing.AzureKeyVault.AzureKeyVaultIntegrityProvider");
+        Console.WriteLine("   • Implements: IAuditIntegrityProvider");
+        Console.WriteLine("   • Secret naming convention: 'audit-key-{tenantId}' (Base64-encoded 256-bit key)");
+        Console.WriteLine("   • Caching: In-memory ConcurrentDictionary to prevent latency on high-frequency writes.\n");
+    }
+
+    private sealed class ShowcaseCryptoKeyProvider : IAuditCryptoKeyProvider
+    {
+        private readonly Dictionary<string, byte[]> _keys = new();
+
+        public ValueTask<byte[]> GetEncryptionKeyAsync(string subjectId, System.Threading.CancellationToken cancellationToken = default)
+        {
+            if (_keys.TryGetValue(subjectId, out var key))
+            {
+                return ValueTask.FromResult(key);
+            }
+            if (_keys.ContainsKey(subjectId + "_shredded"))
+            {
+                throw new KeyNotFoundException($"Key for subject '{subjectId}' has been permanently shredded under GDPR Art. 17.");
+            }
+            var newKey = new byte[32];
+            System.Security.Cryptography.RandomNumberGenerator.Fill(newKey);
+            _keys[subjectId] = newKey;
+            return ValueTask.FromResult(newKey);
+        }
+
+        public ValueTask ShredKeyAsync(string subjectId, System.Threading.CancellationToken cancellationToken = default)
+        {
+            _keys.Remove(subjectId);
+            _keys[subjectId + "_shredded"] = Array.Empty<byte>();
+            return ValueTask.CompletedTask;
+        }
     }
 }

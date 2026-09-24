@@ -17,7 +17,7 @@ namespace EricksonLopez.Auditing.MySql.Tests;
 
 public sealed class MySqlUnitTests
 {
-    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider());
+    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
 
     [Fact]
     public void Options_DefaultValues()
@@ -55,6 +55,7 @@ public sealed class MySqlUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
 
@@ -128,7 +129,7 @@ public sealed class MySqlUnitTests
 
         await store.AppendAsync(record);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(2);
+        fakeConn.ExecutedCommands.Should().HaveCount(3);
 
         var rlsCmd = fakeConn.ExecutedCommands[0];
         rlsCmd.CommandText.Should().Contain("SET @audit_tenant_id = @TenantId;");
@@ -214,7 +215,7 @@ public sealed class MySqlUnitTests
 
         await store.AppendBatchAsync(records);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(3);
+        fakeConn.ExecutedCommands.Should().HaveCount(4);
         fakeConn.ExecutedCommands[0].CommandText.Should().Contain("SET @audit_tenant_id");
         fakeConn.ExecutedCommands[1].CommandText.Should().Contain("INSERT INTO `audit_records`");
         fakeConn.ExecutedCommands[2].CommandText.Should().Contain("INSERT INTO `audit_records`");
@@ -260,13 +261,13 @@ public sealed class MySqlUnitTests
             ResourceId = "doc-99",
             Outcome = AuditOutcome.Failure,
             CorrelationId = "corr-555",
-            AfterRecordId = cursorId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId),
             PageSize = 50
         };
 
         var result = await store.QueryAsync(query);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(2);
+        fakeConn.ExecutedCommands.Should().HaveCount(3);
 
         var rlsCmd = fakeConn.ExecutedCommands[0];
         rlsCmd.CommandText.Should().Contain("SET @audit_tenant_id");
@@ -299,7 +300,7 @@ public sealed class MySqlUnitTests
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -394,7 +395,7 @@ public sealed class MySqlUnitTests
 
         queryResult.Records.Should().HaveCount(2);
         queryResult.HasMore.Should().BeTrue();
-        queryResult.NextCursorId.Should().Be(r2Id);
+        EricksonLopez.Auditing.AuditCursorToken.TryParse(queryResult.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(r2Id);
 
         var first = queryResult.Records[0];
         first.Id.Should().Be(r1Id);
@@ -484,11 +485,11 @@ public sealed class MySqlUnitTests
         {
             TenantId = "tenant-cursor",
             From = fromDate,
-            AfterRecordId = cursorId
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId)
         });
 
         var queryCmd = fakeConn.ExecutedCommands[1];
-        queryCmd.CommandText.Should().Contain("(`occurred_at` > (SELECT `occurred_at` FROM `audit_records` WHERE `id` = @CursorId)");
+        queryCmd.CommandText.Should().Contain("occurred_at > @CursorDate");
         queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId.ToString("D"));
     }
 
@@ -582,7 +583,7 @@ public sealed class MySqlUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -667,3 +668,8 @@ public sealed class MySqlUnitTests
         var verOpenRes = await verifierOpen.VerifyChainAsync("tenant-conn", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
     }
 }
+
+
+
+
+

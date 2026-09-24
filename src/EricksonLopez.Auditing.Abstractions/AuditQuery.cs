@@ -7,7 +7,7 @@ namespace EricksonLopez.Auditing;
 public sealed record AuditQuery
 {
     /// <summary>Gets the tenant identifier scoping the query.</summary>
-    public required string TenantId { get; init; }
+    public required TenantId TenantId { get; init; }
 
     /// <summary>Gets the optional actor identifier filter.</summary>
     public string? ActorId { get; init; }
@@ -34,9 +34,9 @@ public sealed record AuditQuery
     public string? CorrelationId { get; init; }
 
     /// <summary>
-    /// Gets the optional keyset continuation cursor indicating the last record identifier from the previous page.
+    /// Gets the optional keyset continuation cursor indicating the exact page cutoff point from the previous page.
     /// </summary>
-    public Guid? AfterRecordId { get; init; }
+    public string? ContinuationToken { get; init; }
 
     /// <summary>Gets the maximum number of records to return in a single page.</summary>
     public int PageSize { get; init; } = 50;

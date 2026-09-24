@@ -81,10 +81,10 @@ public sealed class EfCoreAuditStoreTests
         var queryResultB = await store.QueryAsync(new AuditQuery { TenantId = "tenant-B" });
 
         queryResultA.Records.Should().HaveCount(1);
-        queryResultA.Records[0].Context.TenantId.Should().Be("tenant-A");
+        queryResultA.Records[0].Context.TenantId.Value.Should().Be("tenant-A");
 
         queryResultB.Records.Should().HaveCount(1);
-        queryResultB.Records[0].Context.TenantId.Should().Be("tenant-B");
+        queryResultB.Records[0].Context.TenantId.Value.Should().Be("tenant-B");
     }
 
     [Fact]
@@ -161,9 +161,13 @@ public sealed class EfCoreAuditStoreTests
         var store = new EfCoreAuditStore(factory);
         var tenant = "tenant-keyset";
 
+        var baseTime = DateTimeOffset.UtcNow;
         var records = Enumerable.Range(1, 5)
-            .Select(i => AuditRecordBuilder.BuildDefault(tenantId: tenant, resourceId: $"res-{i}"))
-            .OrderBy(r => r.Id)
+            .Select(i => AuditRecordBuilder.Create()
+                .WithTenant(tenant)
+                .WithOccurredAt(baseTime.AddSeconds(i))
+                .WithResource("Order", $"res-{i}")
+                .Build())
             .ToList();
 
         await store.AppendBatchAsync(records);
@@ -172,19 +176,19 @@ public sealed class EfCoreAuditStoreTests
         var page1 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2 });
         page1.Records.Should().HaveCount(2);
         page1.HasMore.Should().BeTrue();
-        page1.NextCursorId.Should().NotBeNull();
+        page1.NextPageToken.Should().NotBeNull();
 
         // Page 2
-        var page2 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2, AfterRecordId = page1.NextCursorId });
+        var page2 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2, ContinuationToken = page1.NextPageToken });
         page2.Records.Should().HaveCount(2);
         page2.HasMore.Should().BeTrue();
-        page2.NextCursorId.Should().NotBeNull();
+        page2.NextPageToken.Should().NotBeNull();
 
         // Page 3 (final)
-        var page3 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2, AfterRecordId = page2.NextCursorId });
+        var page3 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2, ContinuationToken = page2.NextPageToken });
         page3.Records.Should().HaveCount(1);
         page3.HasMore.Should().BeFalse();
-        page3.NextCursorId.Should().BeNull();
+        page3.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -471,7 +475,7 @@ public sealed class EfCoreAuditStoreTests
         var result = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2 });
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -526,3 +530,7 @@ public sealed class EfCoreAuditStoreTests
         public Task<AuditDbContext> CreateDbContextAsync(System.Threading.CancellationToken cancellationToken = default) => throw new InvalidOperationException("Should not be called.");
     }
 }
+
+
+
+

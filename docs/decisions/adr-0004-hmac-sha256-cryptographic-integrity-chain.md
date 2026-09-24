@@ -1,4 +1,11 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # ADR-0004: Cryptographic Tamper-Evidence via HMAC-SHA256 Chaining
+
+## Status
+Accepted
+
+## Date
+2026-09-04
 
 ## Context
 
@@ -17,3 +24,4 @@ Provide a verifiable cryptographic integrity chain via `HmacAuditIntegrityServic
 ### Negative / Trade-offs
 * Computing HMAC hashes introduces minimal CPU overhead during write operations.
 * Requires secure tenant key management via an external KMS provider.
+* **Strict Linear Concurrency (CON-01)**: A linear chain ($R_{n} = \text{HMAC}(R_n, H_{n-1})$) requires serializing writes per tenant or channeling them through a buffered decorator to prevent chain bifurcation under concurrent requests. Future versions will support partitioned chains by aggregate/session and periodic Merkle tree root sealing.
