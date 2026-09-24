@@ -9,7 +9,7 @@ using Dapper;
 
 namespace EricksonLopez.Auditing.Oracle;
 
-/// <summary>Verifies the cryptographic HMAC chain for audit records stored in Oracle Database.</summary>
+/// <summary>Provides cryptographic HMAC chain verification for audit records stored in Oracle Database.</summary>
 public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
 {
     private readonly OracleAuditStoreOptions _options;
@@ -28,6 +28,7 @@ public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
     }
 
     /// <inheritdoc/>
+    /// <exception cref="ArgumentException"><paramref name="tenantId"/> is <see langword="null"/> or empty</exception>
     [SuppressMessage("Security", "S2077:Use a parameterized query instead of string formatting.", Justification = "Schema and table names are configured identifiers that cannot be parameterized in SQL.")]
     public async ValueTask<AuditIntegrityVerificationResult> VerifyChainAsync(
         string tenantId,
@@ -38,11 +39,23 @@ public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
         ArgumentException.ThrowIfNullOrEmpty(tenantId);
 
         using var connection = _options.ConnectionFactory();
-        if (connection.State != ConnectionState.Open) connection.Open();
+        if (connection.State != ConnectionState.Open)
+        {
+            if (connection is System.Data.Common.DbConnection dbConn)
+            {
+                await dbConn.OpenAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                connection.Open();
+            }
+        }
 
-        await connection.ExecuteAsync(
+        var sessionCmd = new CommandDefinition(
             "BEGIN DBMS_SESSION.SET_IDENTIFIER(:TenantId); END;",
-            new { TenantId = tenantId });
+            new { TenantId = tenantId },
+            cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(sessionCmd).ConfigureAwait(false);
 
         var tableRef = string.IsNullOrEmpty(_options.Schema)
             ? _options.Table
@@ -55,6 +68,7 @@ public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
                    "RESOURCE_TYPE", "RESOURCE_ID", "AGGREGATE_TYPE", "AGGREGATE_ID",
                    "OUTCOME", "ERROR_CODE",
                    "CORRELATION_ID", "CAUSATION_ID", "REQUEST_ID", "IP_ADDRESS", "USER_AGENT",
+                   "CHANGES" AS "CHANGES_JSON",
                    "INTEGRITY_HASH", "PREVIOUS_HASH"
             FROM {tableRef}
             WHERE "TENANT_ID" = :TenantId
@@ -63,12 +77,14 @@ public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
             ORDER BY "OCCURRED_AT" ASC, "ID" ASC
             """;
 
-        var rows = await connection.QueryAsync<IntegrityRow>(sql, new
+        var cmd = new CommandDefinition(sql, new
         {
             TenantId = tenantId,
             StartDate = from,
             EndDate = until
-        });
+        }, cancellationToken: cancellationToken);
+
+        var rows = await connection.QueryAsync<IntegrityRow>(cmd).ConfigureAwait(false);
 
         int count = 0;
         string? expectedPreviousHash = null;
@@ -77,6 +93,8 @@ public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
         {
             cancellationToken.ThrowIfCancellationRequested();
             count++;
+
+            var changes = DeserializeChanges(row.CHANGES_JSON);
 
             var record = new AuditRecord
             {
@@ -95,6 +113,7 @@ public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
                     RequestId: row.REQUEST_ID,
                     IpAddress: row.IP_ADDRESS,
                     UserAgent: row.USER_AGENT),
+                Changes = changes,
                 IntegrityHash = row.INTEGRITY_HASH,
                 PreviousHash = row.PREVIOUS_HASH
             };
@@ -123,6 +142,23 @@ public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
         return new AuditIntegrityVerificationResult(IsValid: true, VerifiedCount: count);
     }
 
+    private static AuditChange[]? DeserializeChanges(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+
+        var dtos = System.Text.Json.JsonSerializer.Deserialize(json, AuditJsonContext.Default.ListAuditChangeDto);
+        if (dtos is null || dtos.Count == 0) return null;
+
+        var result = new AuditChange[dtos.Count];
+        for (int i = 0; i < dtos.Count; i++)
+        {
+            var d = dtos[i];
+            result[i] = new AuditChange(d.Field, d.OldValue, d.NewValue, d.IsRedacted);
+        }
+
+        return result;
+    }
+
     [SuppressMessage("Minor Code Smell", "S3459:Unassigned auto-property", Justification = "Instantiated and mapped dynamically by Dapper.")]
     [SuppressMessage("Major Code Smell", "S1144:Unused private types or members", Justification = "Instantiated and mapped dynamically by Dapper.")]
     private sealed class IntegrityRow
@@ -146,6 +182,7 @@ public sealed class OracleAuditIntegrityVerifier : IAuditIntegrityVerifier
         public string? REQUEST_ID { get; set; }
         public string? IP_ADDRESS { get; set; }
         public string? USER_AGENT { get; set; }
+        public string? CHANGES_JSON { get; set; }
         public string? INTEGRITY_HASH { get; set; }
         public string? PREVIOUS_HASH { get; set; }
     }

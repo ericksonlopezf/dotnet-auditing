@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Security Policy
 
 `EricksonLopez.Auditing` is designed for compliance-driven, enterprise-grade audit logging where security, non-repudiation, tenant isolation, and forensic data integrity are paramount.
@@ -11,7 +12,7 @@ Only the latest active major and minor releases receive security updates and bug
 | Version | Supported          | Target Frameworks           |
 | :---    | :---:              | :---                        |
 | `2.x`   | :white_check_mark: | .NET 8.0, .NET 9.0, .NET 10.0 |
-| `1.x`   | :x:                | .NET 8.0                    |
+| `1.x`   | :white_check_mark: | .NET 8.0, .NET 9.0, .NET 10.0 |
 
 ---
 

@@ -44,7 +44,7 @@ Assert(resource.Id == "acc-999", "AuditResource.Id matches");
 // ── 2. AuditRecordBuilder & In-Memory Store ───────────────────────────────
 Console.WriteLine("\n--- 2. AuditStore & Record Builder ---");
 
-var record = AuditRecordBuilder.BuildDefault(
+var record = EricksonLopez.Auditing.Testing.AuditRecordBuilder.BuildDefault(
     tenantId: "tenant-corp",
     actorId: "user-123",
     resourceType: "Invoice",
@@ -65,3 +65,6 @@ Console.WriteLine("\n=================================================");
 Console.WriteLine($" ALL {passedTests} NATIVE AOT SUITE TESTS PASSED SUCCESSFULLY! ");
 Console.WriteLine("=== AOT Validator: OK ===");
 Console.WriteLine("=================================================");
+
+
+

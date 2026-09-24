@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Contributing to EricksonLopez.Auditing
 
 Thank you for your interest in contributing to **EricksonLopez.Auditing**! We welcome contributions from the community to help make this framework the most reliable, secure, and performant audit trail ecosystem for .NET.
@@ -29,6 +30,9 @@ dotnet-auditing/
 ├── src/
 │   ├── EricksonLopez.Auditing.Abstractions/       # Foundation contracts, SPI & HMAC service (Zero dependencies)
 │   ├── EricksonLopez.Auditing/                    # Core engine, UUIDv7, AsyncLocal scope, sensitivity pipeline
+│   ├── EricksonLopez.Auditing.Analyzers/          # Roslyn diagnostic analyzers & code fixes (netstandard2.0)
+│   ├── EricksonLopez.Auditing.AzureKeyVault/      # Azure Key Vault cryptographic KMS provider
+│   ├── EricksonLopez.Auditing.Outbox/             # Transactional outbox persistence decorator & contracts
 │   ├── EricksonLopez.Auditing.Testing/            # In-memory store, test doubles, record builders
 │   ├── EricksonLopez.Auditing.Dapper/             # Generic ANSI SQL adapter via Dapper
 │   ├── EricksonLopez.Auditing.PostgreSql/         # PostgreSQL adapter with Row-Level Security (RLS)
@@ -40,13 +44,27 @@ dotnet-auditing/
 │   ├── EricksonLopez.Auditing.MongoDb/            # MongoDB adapter with BSON append-only persistence
 │   └── EricksonLopez.Auditing.OpenTelemetry/      # Semantic ActivitySource and metrics instrumentation
 ├── tests/
-│   ├── EricksonLopez.Auditing.UnitTests/         # In-memory fast unit tests (100% code coverage)
-│   └── EricksonLopez.Auditing.IntegrationTests/  # Testcontainers integration tests with real engines
+│   ├── Common/                                    # Shared fake ADO.NET doubles (FakeDb)
+│   ├── EricksonLopez.Auditing.Tests/              # Core engine, scope, HMAC, and decorator unit tests
+│   ├── EricksonLopez.Auditing.Abstractions.Tests/ # Model, value object, and contract unit tests
+│   ├── EricksonLopez.Auditing.Analyzers.Tests/    # Roslyn analyzer & code fix verification tests
+│   ├── EricksonLopez.Auditing.Dapper.Tests/       # Dapper query formatting & parameter binding tests
+│   ├── EricksonLopez.Auditing.EntityFrameworkCore.Tests/ # EF Core change interception & store tests
+│   ├── EricksonLopez.Auditing.PostgreSql.Tests/   # PostgreSQL RLS & query unit tests (FakeDb)
+│   ├── EricksonLopez.Auditing.SqlServer.Tests/    # SQL Server SESSION_CONTEXT unit tests (FakeDb)
+│   ├── EricksonLopez.Auditing.MySql.Tests/        # MySQL session variable unit tests (FakeDb)
+│   ├── EricksonLopez.Auditing.Oracle.Tests/       # Oracle DBMS_SESSION unit tests (FakeDb)
+│   ├── EricksonLopez.Auditing.Sqlite.Tests/       # SQLite unit tests (FakeDb)
+│   ├── EricksonLopez.Auditing.MongoDb.Tests/      # MongoDB BSON mapping & query unit tests
+│   ├── EricksonLopez.Auditing.OpenTelemetry.Tests/# OpenTelemetry tracing & meter unit tests
+│   ├── EricksonLopez.Auditing.Testing.Tests/      # In-memory store & builder unit tests
+│   ├── EricksonLopez.Auditing.AotSmokeTest/       # Native AOT PublishAot runtime smoke test
+│   └── EricksonLopez.Auditing.IntegrationTests/   # Testcontainers integration tests (real database engines)
 ├── benchmarks/
-│   └── EricksonLopez.Auditing.Benchmarks/        # BenchmarkDotNet performance test suite
+│   └── EricksonLopez.Auditing.Benchmarks/        # BenchmarkDotNet performance test suite & regression baseline
 ├── samples/
-│   └── EricksonLopez.Auditing.Showcase/          # Reference implementation with 11 progressive levels
-└── docs/                                         # Technical documentation and ADRs
+│   └── EricksonLopez.Auditing.Showcase/          # Reference implementation with 12 progressive levels (00-11)
+└── docs/                                         # Technical documentation, guides, and ADRs
 ```
 
 ---
@@ -80,14 +98,17 @@ dotnet build EricksonLopez.Auditing.slnx -c Release
 
 ### 4. Run Unit Tests
 
-Unit tests are fast, isolated, and require zero external infrastructure:
+Unit tests are modularized 1:1 per package, fast, isolated, and require zero external infrastructure:
 
 ```bash
-# Run unit tests across net8.0, net9.0, net10.0
-dotnet test tests/EricksonLopez.Auditing.UnitTests/EricksonLopez.Auditing.UnitTests.csproj
+# Run all unit tests across net8.0, net9.0, net10.0
+dotnet test EricksonLopez.Auditing.slnx --filter "Category!=Integration"
+
+# Run unit tests for a specific package (e.g. Core)
+dotnet test tests/EricksonLopez.Auditing.Tests/EricksonLopez.Auditing.Tests.csproj
 
 # Run unit tests with code coverage collection
-dotnet test tests/EricksonLopez.Auditing.UnitTests/EricksonLopez.Auditing.UnitTests.csproj --collect:"XPlat Code Coverage"
+dotnet test EricksonLopez.Auditing.slnx --filter "Category!=Integration" --collect:"XPlat Code Coverage"
 ```
 
 ### 5. Run Integration Tests (Requires Docker)
@@ -102,10 +123,14 @@ dotnet test tests/EricksonLopez.Auditing.IntegrationTests/EricksonLopez.Auditing
 dotnet test tests/EricksonLopez.Auditing.IntegrationTests/EricksonLopez.Auditing.IntegrationTests.csproj
 ```
 
-### 6. Run Benchmarks
+### 6. Run Benchmarks & Quality Gates
 
 ```bash
+# Run BenchmarkDotNet performance suite
 dotnet run --project benchmarks/EricksonLopez.Auditing.Benchmarks/EricksonLopez.Auditing.Benchmarks.csproj -c Release
+
+# Run mutation testing against Core
+dotnet stryker --config-file stryker-config.json
 ```
 
 ### 7. Run Executable Showcase
@@ -120,7 +145,7 @@ dotnet run --project samples/EricksonLopez.Auditing.Showcase/EricksonLopez.Audit
 
 ### Branch Strategy
 
-* `main`: Production-ready release branch.
+* `main`: Production-ready release branch. Protected.
 * `develop`: Main integration branch for upcoming features and fixes.
 * Feature/Fix branches: Create branches off `develop` named according to purpose:
   * `feat/<feature-name>`
@@ -159,17 +184,20 @@ Please follow the [Conventional Commits](https://www.conventionalcommits.org/) s
 ## Quality Gates & Coding Standards
 
 1. **Native AOT & Trimming**:
-   * All code in `src/` must be 100% Native AOT compatible (`<IsAotCompatible>true</IsAotCompatible>`).
-   * No runtime dynamic reflection or unconstrained generic serialization. Use source-generated `JsonSerializerContext` (`AuditJsonContext`).
+   - Zero dynamic reflection in public serialization pathways (`AuditJsonContext` source generation).
+   - Core and abstractions are validated for Native AOT and trimming (`EnableTrimAnalyzer=true`).
 2. **Immutability & Thread-Safety**:
-   * `AuditRecord`, `AuditContext`, `AuditActor`, `AuditResource`, `AuditChange` are immutable records.
-   * `AuditScope` manages `AsyncLocal<T>` safely across async execution contexts.
+   - `AuditRecord`, `AuditContext`, `AuditActor`, `AuditResource`, `AuditChange` are immutable records.
+   - `AuditScope` manages `AsyncLocal<T>` safely across async execution contexts.
 3. **Multi-Tenant Security**:
-   * Every database adapter must set session context/RLS variables before issuing commands.
-   * Batch insertions must enforce single-tenant homogeneity (`All records in a batch must belong to the same tenant`).
+   - Every database adapter must set session context/RLS variables before issuing commands.
+   - Batch insertions must enforce single-tenant homogeneity (`All records in a batch must belong to the same tenant`).
 4. **Code Coverage & Mutation Score**:
-   * New functionality must include unit tests achieving 100% line coverage in core and cryptographic components.
-   * Mutation testing score threshold: $\ge 95\%$ break threshold across all packages, $100\%$ for core cryptographic services.
+   - New functionality must include unit tests achieving ≥99% line coverage.
+   - Mutation testing score threshold: `≥95%` break threshold across all packages, `100%` for core cryptographic services.
+5. **Benchmark Regression Gate**:
+   - Hot path combinators enforce 0 B heap allocations.
+   - Mean latency regression must not exceed 5% vs baseline.
 
 ---
 
@@ -177,6 +205,6 @@ Please follow the [Conventional Commits](https://www.conventionalcommits.org/) s
 
 1. Fork the repository and create your branch from `develop`.
 2. Ensure code compiles cleanly with zero warnings (`dotnet build -c Release`).
-3. Ensure all unit tests pass (`dotnet test tests/EricksonLopez.Auditing.UnitTests`).
+3. Ensure all unit tests pass (`dotnet test EricksonLopez.Auditing.slnx --filter "Category!=Integration"`).
 4. Update or add documentation in `/docs/` and `README.md` if public APIs or behaviors changed.
 5. Submit your PR targeting the `develop` branch using the provided [Pull Request Template](.github/PULL_REQUEST_TEMPLATE.md).

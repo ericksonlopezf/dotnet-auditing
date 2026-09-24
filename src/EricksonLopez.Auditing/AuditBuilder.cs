@@ -23,7 +23,10 @@ internal sealed class AuditBuilder : IAuditBuilder
     {
         var config = GetOrThrowConfig();
         config.EnableIntegrityChain = true;
+        Services.TryAddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         Services.TryAddSingleton<HmacAuditIntegrityService>();
+
+        AuditBuilderHelper.ApplyDecorators(this);
         return this;
     }
 
@@ -31,6 +34,7 @@ internal sealed class AuditBuilder : IAuditBuilder
         where TStore : class, IAuditStore
     {
         Services.AddSingleton<IAuditStore, TStore>();
+        AuditBuilderHelper.ApplyDecorators(this);
         return this;
     }
 

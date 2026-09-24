@@ -1,7 +1,8 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # ADR-0009: Modular Test Suite & Mutation Testing Isolation
 
 ## Status
-**Accepted**
+Accepted
 
 ## Date
 2026-08-26

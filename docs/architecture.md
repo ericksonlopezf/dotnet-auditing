@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # System Architecture Guide: EricksonLopez.Auditing
 
 ## 1. Executive Summary & Core Mission
@@ -11,10 +12,12 @@ The framework answers with non-repudiable certainty:
 graph TD
     A[Caller / Application Service] -->|Ambient Scope Context| B[EricksonLopez.Auditing Core Engine]
     B -->|PII Sanitization & Denylist| C[AuditSensitivityPipeline]
-    B -->|HMAC-SHA256 Digest| D[HmacAuditIntegrityService]
-    B -->|Storage SPI IAuditStore| E[Storage Adapter Layer]
+    B -->|Asynchronous Channel Buffer| BUF[BufferedAuditStoreDecorator]
+    BUF -->|Failure Policy Interception| RES[ResilientAuditStoreDecorator]
+    RES -->|HMAC-SHA256 Digest & Hash Chain| INT[IntegrityAuditStoreDecorator]
+    INT -->|Storage SPI IAuditStore| E[Storage & Dispatch Layer]
     
-    subgraph Storage Engines
+    subgraph Storage & Dispatch Engines
         E --> F[PostgreSqlAuditStore - FORCE RLS]
         E --> G[SqlServerAuditStore - SESSION_CONTEXT]
         E --> H[SqliteAuditStore - Dapper / Memory / Disk]
@@ -24,9 +27,13 @@ graph TD
         E --> L[EfCoreAuditStore - AuditDbContext]
         E --> M[DapperAuditStore - Generic ANSI SQL]
         E --> N[InMemoryAuditStore - Test Suite]
+        E --> OUT[OutboxAuditStore - Transactional Outbox]
     end
     
-    B -->|W3C Activity & Metrics| O[EricksonLopez.Auditing.OpenTelemetry]
+    subgraph Key Management & Observability
+        INT -.-> AKV[AzureKeyVaultIntegrityProvider - Azure Key Vault]
+        B -->|W3C Activity & Metrics| O[EricksonLopez.Auditing.OpenTelemetry]
+    end
 ```
 
 ---
@@ -34,10 +41,11 @@ graph TD
 ## 2. Core Architectural Invariants
 
 1. **Immutability and Append-Only Storage**: The core storage interface `IAuditStore` exposes only append operations (`AppendAsync`, `AppendBatchAsync`) and queries (`QueryAsync`). No `Update` or `Delete` operations exist in the API or database migrations.
-2. **Strict Multi-Tenant Isolation**: Every record requires a valid `TenantId` (or the reserved platform constant `AuditContext.SystemTenantId`). Relational storage engines enforce isolation at the database layer before query execution.
+2. **Strict Multi-Tenant Isolation**: Every record requires a valid `TenantId` (or the reserved platform constant `AuditContext.SystemTenantId`). Relational storage engines enforce isolation at the database layer before query execution via session variables, RLS, or connection context.
 3. **Monotonic Temporal Ordering via UUIDv7**: Identifiers are generated with `AuditId.NewId()` conforming to RFC 9562 UUIDv7. Unix millisecond timestamps in high bits ensure sequential index inserts and eliminate B-Tree page fragmentation.
-4. **Zero-Leakage Security Invariant**: The `AuditSensitivityPipeline` intercepts and strips sensitive credentials, tokens, and PII before persistence according to global denylists and explicit redaction rules.
-5. **Zero Dynamic Runtime Reflection**: JSON column serialization uses C# source generators (`System.Text.Json.Serialization.JsonSerializerContext`), ensuring full compatibility with Native AOT compilation and aggressive IL trimming.
+4. **Zero-Leakage Security Invariant**: The `AuditSensitivityPipeline` intercepts and strips sensitive credentials, tokens, and PII before persistence according to global denylists, string length limits (`MaxStringLength`), and explicit redaction rules.
+5. **Zero Dynamic Runtime Reflection**: JSON column serialization uses C# source generators (`System.Text.Json.Serialization.JsonSerializerContext`), ensuring full compatibility with Native AOT compilation and aggressive IL trimming across all providers.
+6. **Crypto-Shredding Compliance (GDPR Art. 17)**: PII fields are protected using subject-specific encryption keys managed by `IAuditCryptoKeyProvider`. When key destruction (`ShredKeyAsync`) is executed, encrypted PII becomes permanently unrecoverable without altering or invalidating the historical cryptographic blockchain.
 
 ---
 
@@ -50,19 +58,25 @@ sequenceDiagram
     participant Scope as AuditScope (AsyncLocal)
     participant Core as Auditing Core Engine
     participant Sens as AuditSensitivityPipeline
+    participant Buf as BufferedAuditStoreDecorator
+    participant Res as ResilientAuditStoreDecorator
     participant HMAC as HmacAuditIntegrityService
-    participant Store as IAuditStore (e.g., PostgreSQL)
+    participant Store as IAuditStore (e.g., PostgreSQL / Outbox)
     participant OTel as OpenTelemetry
 
     App->>Scope: Begin(metadata) / WithMetadata(key, value)
     App->>Core: AppendAsync(AuditRecord)
-    Core->>Sens: Apply(record.Changes)
-    Sens-->>Core: Sanitized Changes (Redacted / Filtered)
+    Core->>Sens: SanitizeAsync(record)
+    Sens-->>Core: Sanitized Changes (Redacted / Filtered / Truncated)
+    Core->>Buf: AppendAsync(sanitizedRecord)
+    Note over Buf: Bounded Channel Buffer (Async Drain)
+    Buf->>Res: AppendBatchAsync(batch)
+    Note over Res: Evaluates FailOpen / CriticalActionCodes
     opt Integrity Chain Enabled
-        Core->>HMAC: ComputeHash(record, previousHash)
-        HMAC-->>Core: SHA-256 Digest
+        Res->>HMAC: ComputeHash(record, previousHash)
+        HMAC-->>Res: SHA-256 Digest
     end
-    Core->>Store: AppendAsync(sanitizedRecord)
+    Res->>Store: AppendBatchAsync(signedRecords)
     Store->>Store: Set RLS / Session Context
     Store->>Store: INSERT INTO records (...)
     Core->>OTel: EnrichCurrentActivity() & Increment Counters
@@ -102,6 +116,7 @@ If an attacker modifies any field of a stored record (such as altering `Outcome`
 | **SQLite** | Local / Edge Database Separation | Connection-level parameterization & index filter |
 | **MongoDB** | BSON Document Partitioning | Tenant-scoped collection indexes |
 | **EF Core** | Global Query Filter & Model Mapping | Tenant-scoped queries on `AuditDbContext` |
+| **Outbox** | Staged Message Storage | Appends to local transactional outbox |
 
 ---
 
@@ -118,6 +133,9 @@ graph TD
 
     Abs["EricksonLopez.Auditing.Abstractions"]:::abstract
     Core["EricksonLopez.Auditing (Core)"]:::core
+    Anlz["EricksonLopez.Auditing.Analyzers"]:::core
+    AKV["EricksonLopez.Auditing.AzureKeyVault"]:::adapter
+    OUT["EricksonLopez.Auditing.Outbox"]:::adapter
     OTel["EricksonLopez.Auditing.OpenTelemetry"]:::adapter
     Testing["EricksonLopez.Auditing.Testing"]:::test
     
@@ -131,22 +149,30 @@ graph TD
     Mon["EricksonLopez.Auditing.MongoDb"]:::adapter
 
     Core --> Abs
+    Core -.->|Analyzers| Anlz
+    AKV --> Abs
+    OUT --> Abs
     OTel --> Abs
     Testing --> Abs
     Testing --> Core
     
-    PG --> Abs
-    MS --> Abs
-    My --> Abs
-    Ora --> Abs
-    Sq --> Abs
+    PG --> Dap
+    MS --> Dap
+    My --> Dap
+    Ora --> Dap
+    Sq --> Dap
     Dap --> Abs
     EF --> Abs
     Mon --> Abs
 ```
 
-* **Layer 1: Abstractions (`EricksonLopez.Auditing.Abstractions`):** Zero external dependencies. Owns domain contracts (`AuditRecord`, `AuditContext`), storage SPI (`IAuditStore`), provider interfaces, and pure HMAC computation.
-* **Layer 2: Core Engine (`EricksonLopez.Auditing`):** Owns `AuditScope` ambient orchestration, RFC 9562 UUIDv7 generator, sensitivity pipeline, and fluent DI builder.
-* **Layer 3: Storage Adapters (`PostgreSql`, `SqlServer`, `MySql`, `Oracle`, `Sqlite`, `Dapper`, `MongoDb`, `EntityFrameworkCore`):** Standalone database drivers implementing `IAuditStore` with native session contexts, keyset pagination, and Dapper/EF/BSON persistence. Depends only on `Abstractions` (Layer 1).
-* **Layer 3: Observability (`EricksonLopez.Auditing.OpenTelemetry`):** W3C TraceContext enrichment, semantic activities, and counters. Depends only on `Abstractions` (Layer 1).
-* **Layer 4: Testing Infrastructure (`EricksonLopez.Auditing.Testing`):** `InMemoryAuditStore`, fluent `AuditRecordBuilder`, and mock cryptographic key providers for unit tests. Depends on both `Abstractions` (Layer 1) and `Core` (Layer 2).
+* **Layer 1: Abstractions (`EricksonLopez.Auditing.Abstractions`):** Zero external dependencies. Owns domain contracts (`AuditRecord`, `AuditContext`), storage SPI (`IAuditStore`), provider interfaces (`IAuditCryptoKeyProvider`, `IAuditHashAlgorithm`), and pure HMAC computation.
+* **Layer 2: Core Engine & Compile-Time Analyzers:**
+  - `EricksonLopez.Auditing`: Owns `AuditScope` ambient orchestration, RFC 9562 UUIDv7 generator (`AuditId`), sensitivity pipeline, decorators (`BufferedAuditStoreDecorator`, `ResilientAuditStoreDecorator`, `IntegrityAuditStoreDecorator`), and fluent DI builder.
+  - `EricksonLopez.Auditing.Analyzers`: Roslyn diagnostic analyzers and code fixes enforcing immutability and compliance at compile time.
+* **Layer 3: Enterprise Integrations (`AzureKeyVault`, `Outbox`):**
+  - `AzureKeyVault`: Cloud KMS secret retrieval for cryptographic keys and automated rotation.
+  - `Outbox`: Transactional outbox storage decorator and message contracts.
+* **Layer 4: Storage Adapters (`PostgreSql`, `SqlServer`, `MySql`, `Oracle`, `Sqlite`, `Dapper`, `MongoDb`, `EntityFrameworkCore`):** Standalone database drivers implementing `IAuditStore` with native session contexts, keyset pagination, and Dapper/EF/BSON persistence.
+* **Layer 5: Observability (`EricksonLopez.Auditing.OpenTelemetry`):** W3C TraceContext enrichment, semantic activities, and counters.
+* **Layer 6: Testing Infrastructure (`EricksonLopez.Auditing.Testing`):** `InMemoryAuditStore`, fluent `AuditRecordBuilder`, and mock cryptographic key providers for unit tests.

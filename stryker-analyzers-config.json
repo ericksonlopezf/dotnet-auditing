@@ -1,0 +1,37 @@
+{
+  "stryker-config": {
+    "project": "EricksonLopez.Auditing.Analyzers.csproj",
+    "test-projects": [
+      "tests/EricksonLopez.Auditing.Analyzers.Tests/EricksonLopez.Auditing.Analyzers.Tests.csproj"
+    ],
+    "mutate": [
+      "**/*.cs",
+      "!bin/**",
+      "!obj/**",
+      "!**/*.g.cs",
+      "!**/*.AssemblyInfo.cs"
+    ],
+    "thresholds": {
+      "high": 100,
+      "low": 98,
+      "break": 95
+    },
+    "reporters": [
+      "html",
+      "json",
+      "cleartext",
+      "progress"
+    ],
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose",
+      "EnableConcurrentExecution",
+      "ConfigureGeneratedCodeAnalysis"
+    ],
+    "ignore-mutations": [
+      "String",
+      "Initializer"
+    ],
+    "concurrency": 2
+  }
+}

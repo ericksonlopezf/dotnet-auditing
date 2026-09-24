@@ -50,7 +50,7 @@ public sealed class InMemoryAuditStoreTests
         var tenantA = store.ForTenant("tenant-a");
 
         tenantA.Should().HaveCount(2);
-        tenantA.Should().AllSatisfy(r => r.Context.TenantId.Should().Be("tenant-a"));
+        tenantA.Should().AllSatisfy(r => r.Context.TenantId.Value.Should().Be("tenant-a"));
     }
 
     [Fact]
@@ -68,7 +68,7 @@ public sealed class InMemoryAuditStoreTests
 
         result.Records.Should().HaveCount(1);
         result.Records.Should().AllSatisfy(r =>
-            r.Context.TenantId.Should().Be("tenant-a"),
+            r.Context.TenantId.Value.Should().Be("tenant-a"),
             "Tenant A query must never return Tenant B records");
     }
 
@@ -123,14 +123,14 @@ public sealed class InMemoryAuditStoreTests
         var page1 = await store.QueryAsync(new AuditQuery { TenantId = "tenant-a", PageSize = 2 });
         page1.Records.Should().HaveCount(2);
         page1.HasMore.Should().BeTrue();
-        page1.NextCursorId.Should().NotBeNull();
+        page1.NextPageToken.Should().NotBeNull();
 
         // Second page
         var page2 = await store.QueryAsync(new AuditQuery
         {
             TenantId = "tenant-a",
             PageSize = 2,
-            AfterRecordId = page1.NextCursorId
+            ContinuationToken = page1.NextPageToken
         });
         page2.Records.Should().HaveCount(2);
 
@@ -139,11 +139,11 @@ public sealed class InMemoryAuditStoreTests
         {
             TenantId = "tenant-a",
             PageSize = 2,
-            AfterRecordId = page2.NextCursorId
+            ContinuationToken = page2.NextPageToken
         });
         page3.Records.Should().HaveCount(1);
         page3.HasMore.Should().BeFalse();
-        page3.NextCursorId.Should().BeNull();
+        page3.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -249,7 +249,7 @@ public sealed class InMemoryAuditStoreTests
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -353,7 +353,7 @@ public sealed class InMemoryAuditStoreTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -377,11 +377,15 @@ public sealed class InMemoryAuditStoreTests
         var result = await store.QueryAsync(new AuditQuery
         {
             TenantId = "tenant-a",
-            AfterRecordId = Guid.NewGuid()
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow.AddDays(1), Guid.NewGuid())
         });
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 }
+
+
+
+
