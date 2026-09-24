@@ -11,7 +11,7 @@ namespace EricksonLopez.Auditing.Showcase.Levels;
 /// </summary>
 public static class Level02_Configuration
 {
-    public static Task RunAsync()
+    public static async Task RunAsync()
     {
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("\n================================================================================");
@@ -94,7 +94,7 @@ public static class Level02_Configuration
             new AuditChange("ProfileHash", null, AuditSensitivityPipeline.HashValue("alice@enterprise.com")) // SHA-256 Hash
         };
 
-        var sanitized = sensitivityPipeline.Apply(rawChanges);
+        var sanitized = await sensitivityPipeline.ApplyAsync(rawChanges, "tenant-1");
         Console.WriteLine($"  Original changes:  {rawChanges.Length} fields");
         Console.WriteLine($"  Sanitized changes: {sanitized?.Count ?? 0} fields");
         if (sanitized is not null)
@@ -105,7 +105,5 @@ public static class Level02_Configuration
             }
         }
         Console.WriteLine();
-
-        return Task.CompletedTask;
     }
 }

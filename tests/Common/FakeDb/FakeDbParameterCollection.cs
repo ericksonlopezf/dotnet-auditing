@@ -34,3 +34,6 @@ internal sealed class FakeDbParameterCollection : DbParameterCollection
     protected override void SetParameter(int index, DbParameter value) => _parameters[index] = value;
     protected override void SetParameter(string parameterName, DbParameter value) => _parameters[IndexOf(parameterName)] = value;
 }
+
+
+

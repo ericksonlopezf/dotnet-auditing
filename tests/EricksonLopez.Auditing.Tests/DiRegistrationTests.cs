@@ -130,8 +130,80 @@ public sealed class DiRegistrationTests
             "no default audit store should be registered; consumers must configure one explicitly");
     }
 
+    [Fact]
+    public void EnableBuffering_Before_UseStore_AppliesDecorator()
+    {
+        var services = new ServiceCollection();
+        services.AddAuditing()
+            .EnableBuffering()
+            .UseStore<InMemoryAuditStore>();
+
+        var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredService<IAuditStore>();
+        store.Should().BeOfType<BufferedAuditStoreDecorator>();
+    }
+
+    [Fact]
+    public void EnableBuffering_After_UseStore_AppliesDecorator()
+    {
+        var services = new ServiceCollection();
+        services.AddAuditing()
+            .UseStore<InMemoryAuditStore>()
+            .EnableBuffering();
+
+        var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredService<IAuditStore>();
+        store.Should().BeOfType<BufferedAuditStoreDecorator>();
+    }
+
+    [Fact]
+    public void EnableIntegrityChain_Before_UseStore_AppliesDecorator()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IAuditIntegrityProvider>(new TestAuditIntegrityProvider());
+        services.AddAuditing()
+            .EnableIntegrityChain()
+            .UseStore<InMemoryAuditStore>();
+
+        var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredService<IAuditStore>();
+        store.Should().BeOfType<IntegrityAuditStoreDecorator>();
+    }
+
+    [Fact]
+    public void EnableIntegrityChain_After_UseStore_AppliesDecorator()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IAuditIntegrityProvider>(new TestAuditIntegrityProvider());
+        services.AddAuditing()
+            .UseStore<InMemoryAuditStore>()
+            .EnableIntegrityChain();
+
+        var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredService<IAuditStore>();
+        store.Should().BeOfType<IntegrityAuditStoreDecorator>();
+    }
+
+    [Fact]
+    public void EnableBuffering_And_EnableIntegrityChain_ProducesCorrectChain()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IAuditIntegrityProvider>(new TestAuditIntegrityProvider());
+        services.AddAuditing()
+            .EnableBuffering()
+            .EnableIntegrityChain()
+            .UseStore<InMemoryAuditStore>();
+
+        var provider = services.BuildServiceProvider();
+        var store = provider.GetRequiredService<IAuditStore>();
+        store.Should().BeOfType<BufferedAuditStoreDecorator>();
+    }
+
     private sealed class CustomActorProviderStub : IAuditActorProvider
     {
         public AuditActor GetCurrentActor() => AuditActor.Anonymous;
     }
 }
+
+
+

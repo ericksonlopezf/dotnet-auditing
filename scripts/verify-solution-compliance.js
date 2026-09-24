@@ -20,14 +20,16 @@ const standardExceptions = new Set([
   'CHANGELOG.md',
   'SUPPORT.md',
   'GOVERNANCE.md',
-  'PULL_REQUEST_TEMPLATE.md'
+  'PULL_REQUEST_TEMPLATE.md',
+  'AnalyzerReleases.Shipped.md',
+  'AnalyzerReleases.Unshipped.md'
 ]);
 
 function getAllFiles(dir, filter) {
   let results = [];
   const list = fs.readdirSync(dir);
   for (const item of list) {
-    if (item === 'bin' || item === 'obj' || item === 'node_modules' || item === '.git' || item === '.vs' || item === 'TestResults' || item === 'StrykerOutput' || item === 'results' || item === 'BenchmarkDotNet.Artifacts' || item.startsWith('coveragereport')) {
+    if (item === 'bin' || item === 'obj' || item === 'node_modules' || item === '.git' || item === '.vs' || item === 'TestResults' || item === 'StrykerOutput' || item === 'results' || item === 'BenchmarkDotNet.Artifacts' || item.startsWith('coveragereport') || item === 'MEGA-AUDIT' || item === 'audit-reports') {
       continue;
     }
     const fullPath = path.join(dir, item);

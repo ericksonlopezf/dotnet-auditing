@@ -75,7 +75,7 @@ public sealed class MongoAuditStoreIntegrationTests : IAsyncLifetime
             await Task.Delay(1);
         }
 
-        records = records.OrderBy(r => r.Id).ToList();
+        records = records.OrderBy(r => r.OccurredAt).ThenBy(r => r.Id).ToList();
         await _store.AppendBatchAsync(records);
 
         var query = new AuditQuery { TenantId = tenant, PageSize = 2 };
@@ -83,20 +83,23 @@ public sealed class MongoAuditStoreIntegrationTests : IAsyncLifetime
 
         page1.Records.Should().HaveCount(2);
         page1.HasMore.Should().BeTrue();
-        page1.NextCursorId.Should().Be(records[1].Id);
+        page1.NextPageToken.Should().NotBeNull(); EricksonLopez.Auditing.AuditCursorToken.TryParse(page1.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(records[1].Id);
 
-        var query2 = new AuditQuery { TenantId = tenant, PageSize = 2, AfterRecordId = page1.NextCursorId };
+        var query2 = new AuditQuery { TenantId = tenant, PageSize = 2, ContinuationToken = page1.NextPageToken };
         var page2 = await _store.QueryAsync(query2);
 
         page2.Records.Should().HaveCount(2);
         page2.HasMore.Should().BeTrue();
-        page2.NextCursorId.Should().Be(records[3].Id);
+        page2.NextPageToken.Should().NotBeNull(); EricksonLopez.Auditing.AuditCursorToken.TryParse(page2.NextPageToken, out _, out parsedId).Should().BeTrue(); parsedId.Should().Be(records[3].Id);
 
-        var query3 = new AuditQuery { TenantId = tenant, PageSize = 2, AfterRecordId = page2.NextCursorId };
+        var query3 = new AuditQuery { TenantId = tenant, PageSize = 2, ContinuationToken = page2.NextPageToken };
         var page3 = await _store.QueryAsync(query3);
 
         page3.Records.Should().HaveCount(1);
         page3.HasMore.Should().BeFalse();
-        page3.NextCursorId.Should().BeNull();
+        page3.NextPageToken.Should().BeNull();
     }
 }
+
+
+

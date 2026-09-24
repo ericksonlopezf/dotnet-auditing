@@ -17,7 +17,7 @@ namespace EricksonLopez.Auditing.SqlServer.Tests;
 
 public sealed class SqlServerUnitTests
 {
-    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider());
+    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
 
     [Fact]
     public void Options_DefaultValues()
@@ -56,6 +56,7 @@ public sealed class SqlServerUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
 
@@ -132,7 +133,7 @@ public sealed class SqlServerUnitTests
 
         await store.AppendAsync(record);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(2);
+        fakeConn.ExecutedCommands.Should().HaveCount(3);
 
         // 1. RLS command
         var rlsCmd = fakeConn.ExecutedCommands[0];
@@ -220,10 +221,11 @@ public sealed class SqlServerUnitTests
 
         await store.AppendBatchAsync(records);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(3);
+        fakeConn.ExecutedCommands.Should().HaveCount(4);
         fakeConn.ExecutedCommands[0].CommandText.Should().Contain("sp_set_session_context");
         fakeConn.ExecutedCommands[1].CommandText.Should().Contain("INSERT INTO [audit].[records]");
         fakeConn.ExecutedCommands[2].CommandText.Should().Contain("INSERT INTO [audit].[records]");
+        fakeConn.ExecutedCommands[3].CommandText.Should().Contain("sp_set_session_context");
     }
 
     [Fact]
@@ -267,13 +269,13 @@ public sealed class SqlServerUnitTests
             ResourceId = "doc-99",
             Outcome = AuditOutcome.Failure,
             CorrelationId = "corr-555",
-            AfterRecordId = cursorId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId),
             PageSize = 50
         };
 
         var result = await store.QueryAsync(query);
 
-        fakeConn.ExecutedCommands.Should().HaveCount(2);
+        fakeConn.ExecutedCommands.Should().HaveCount(3);
 
         var rlsCmd = fakeConn.ExecutedCommands[0];
         rlsCmd.Parameters["TenantId"].Value.Should().Be("tenant-filter");
@@ -305,7 +307,7 @@ public sealed class SqlServerUnitTests
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -401,7 +403,7 @@ public sealed class SqlServerUnitTests
 
         queryResult.Records.Should().HaveCount(2);
         queryResult.HasMore.Should().BeTrue();
-        queryResult.NextCursorId.Should().Be(r2Id);
+        EricksonLopez.Auditing.AuditCursorToken.TryParse(queryResult.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(r2Id);
 
         var first = queryResult.Records[0];
         first.Id.Should().Be(r1Id);
@@ -495,12 +497,13 @@ public sealed class SqlServerUnitTests
         {
             TenantId = "tenant-cursor",
             From = fromDate,
-            AfterRecordId = cursorId
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId)
         });
 
         var queryCmd = fakeConn.ExecutedCommands[1];
-        queryCmd.CommandText.Should().Contain("([occurred_at] > (SELECT [occurred_at] FROM [audit].[records] WHERE [id] = @CursorId)");
+        queryCmd.CommandText.Should().Contain("([occurred_at] > @CursorDate");
         queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId);
+        queryCmd.Parameters["CursorDate"].Value.Should().NotBeNull();
     }
 
     [Fact]
@@ -593,7 +596,7 @@ public sealed class SqlServerUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -678,4 +681,192 @@ public sealed class SqlServerUnitTests
         openConn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(r));
         var verOpenRes = await verifierOpen.VerifyChainAsync("tenant-conn", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
     }
+
+    [Fact]
+    public void SqlServerAuditStoreOptions_SchemaAndTable_Validation()
+    {
+        var options = new SqlServerAuditStoreOptions();
+        options.Schema.Should().Be("audit");
+        options.Table.Should().Be("records");
+
+        options.Schema = "custom_schema";
+        options.Schema.Should().Be("custom_schema");
+        options.Table = "custom_table";
+        options.Table.Should().Be("custom_table");
+
+        Action actEmptySchema = () => options.Schema = "";
+        actEmptySchema.Should().Throw<ArgumentException>();
+
+        Action actWhitespaceSchema = () => options.Schema = "   ";
+        actWhitespaceSchema.Should().Throw<ArgumentException>();
+
+        Action actInvalidSchema = () => options.Schema = "invalid-schema!";
+        actInvalidSchema.Should().Throw<ArgumentException>()
+            .WithMessage("*is not a valid SQL identifier*")
+            .WithParameterName("value");
+
+        Action actEmptyTable = () => options.Table = "";
+        actEmptyTable.Should().Throw<ArgumentException>();
+
+        Action actWhitespaceTable = () => options.Table = "   ";
+        actWhitespaceTable.Should().Throw<ArgumentException>();
+
+        Action actInvalidTable = () => options.Table = "invalid-table!";
+        actInvalidTable.Should().Throw<ArgumentException>()
+            .WithMessage("*is not a valid SQL identifier*")
+            .WithParameterName("value");
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_EmptyBatch_ReturnsWithoutExecuting()
+    {
+        var conn = new FakeDbConnection();
+        var store = new SqlServerAuditStore(new SqlServerAuditStoreOptions { ConnectionFactory = () => conn });
+        await store.AppendBatchAsync(Array.Empty<AuditRecord>());
+        conn.ExecutedCommands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Append_And_AppendBatch_WithSensitivityPipeline_SanitizesRecords()
+    {
+        var conn = new FakeDbConnection();
+        var pipeline = new TestSensitivityPipeline();
+        var store = new SqlServerAuditStore(new SqlServerAuditStoreOptions { ConnectionFactory = () => conn }, pipeline);
+
+        var r = AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens");
+        await store.AppendAsync(r);
+        pipeline.SanitizeCount.Should().Be(1);
+
+        var records = new[]
+        {
+            AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens"),
+            AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens")
+        };
+        await store.AppendBatchAsync(records);
+        pipeline.SanitizeCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_WithNonDbConnection_OpensAndBeginsTransaction()
+    {
+        var innerConn = new FakeDbConnection();
+        innerConn.Close();
+        var wrapper = new NonDbConnectionWrapper(innerConn);
+        var store = new SqlServerAuditStore(new SqlServerAuditStoreOptions { ConnectionFactory = () => wrapper });
+
+        var records = new[] { AuditRecordBuilder.BuildDefault(tenantId: "tenant-nondb") };
+        await store.AppendBatchAsync(records);
+        innerConn.ExecutedCommands.Should().Contain(c => c.CommandText.Contains("INSERT INTO"));
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_WithNonDbConnection_AlreadyOpen_DoesNotCallOpen()
+    {
+        var innerConn = new FakeDbConnection();
+        innerConn.Open();
+        var wrapper = new NonDbConnectionWrapper(innerConn);
+        var store = new SqlServerAuditStore(new SqlServerAuditStoreOptions { ConnectionFactory = () => wrapper });
+
+        var records = new[] { AuditRecordBuilder.BuildDefault(tenantId: "tenant-nondb") };
+        await store.AppendBatchAsync(records);
+        innerConn.ExecutedCommands.Should().Contain(c => c.CommandText.Contains("INSERT INTO"));
+    }
+
+    [Fact]
+    public async Task Verifier_WithNonDbConnection_OpensConnection()
+    {
+        var innerConn = new FakeDbConnection();
+        innerConn.Close();
+        var wrapper = new NonDbConnectionWrapper(innerConn);
+        var verifier = new SqlServerAuditIntegrityVerifier(new SqlServerAuditStoreOptions { ConnectionFactory = () => wrapper }, _hmac);
+
+        var r = AuditRecordBuilder.BuildDefault(tenantId: "tenant-nondb");
+        var hash = _hmac.ComputeHash(r, null);
+        r = r with { IntegrityHash = hash };
+
+        innerConn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(r));
+        var result = await verifier.VerifyChainAsync("tenant-nondb", DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow);
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Verifier_RecordsWithChanges_IncludingRedacted_VerifyCorrectly()
+    {
+        var conn = new FakeDbConnection();
+        var r = AuditRecordBuilder.Create()
+            .WithTenant("tenant-changes")
+            .WithAction(AuditAction.Update)
+            .WithResource("Invoice", "inv-1")
+            .AddChange("amount", "100", "200", isRedacted: false)
+            .AddRedactedChange("ssn")
+            .Build();
+
+        var hash = _hmac.ComputeHash(r, null);
+        var signed = r with { IntegrityHash = hash, PreviousHash = null };
+
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(signed));
+        var verifier = new SqlServerAuditIntegrityVerifier(new SqlServerAuditStoreOptions { ConnectionFactory = () => conn }, _hmac);
+
+        var result = await verifier.VerifyChainAsync("tenant-changes", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
+        result.IsValid.Should().BeTrue();
+        result.VerifiedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AppendAsync_WithIdempotencyKey_SetsIdempotencyKeyParameter()
+    {
+        var fakeConn = new FakeDbConnection();
+        var store = new SqlServerAuditStore(new SqlServerAuditStoreOptions { ConnectionFactory = () => fakeConn });
+
+        var r = AuditRecordBuilder.Create()
+            .WithTenant("tenant-idem")
+            .Build();
+        r = r with { Context = r.Context with { IdempotencyKey = "idem-key-sqlserver" } };
+
+        await store.AppendAsync(r);
+
+        var insertCmd = fakeConn.ExecutedCommands.First(c => c.CommandText.Contains("INSERT INTO"));
+        insertCmd.Parameters["IdempotencyKey"].Value.Should().Be("idem-key-sqlserver");
+    }
 }
+
+file sealed class TestSensitivityPipeline : IAuditSensitivityPipeline
+{
+    public int SanitizeCount { get; private set; }
+
+    public ValueTask<AuditRecord> SanitizeAsync(AuditRecord record, CancellationToken cancellationToken = default)
+    {
+        SanitizeCount++;
+        return ValueTask.FromResult(record);
+    }
+
+    public ValueTask<IReadOnlyList<AuditChange>?> ApplyAsync(IReadOnlyList<AuditChange>? changes, string tenantId, CancellationToken cancellationToken = default)
+    {
+        return ValueTask.FromResult(changes);
+    }
+}
+
+file sealed class NonDbConnectionWrapper : IDbConnection
+{
+    private readonly IDbConnection _inner;
+    public NonDbConnectionWrapper(IDbConnection inner) => _inner = inner;
+
+    [System.Diagnostics.CodeAnalysis.AllowNull]
+    public string ConnectionString { get => _inner.ConnectionString ?? string.Empty; set => _inner.ConnectionString = value ?? string.Empty; }
+    public int ConnectionTimeout => _inner.ConnectionTimeout;
+    public string Database => _inner.Database;
+    public ConnectionState State => _inner.State;
+
+    public IDbTransaction BeginTransaction() => _inner.BeginTransaction();
+    public IDbTransaction BeginTransaction(IsolationLevel il) => _inner.BeginTransaction(il);
+    public void ChangeDatabase(string databaseName) => _inner.ChangeDatabase(databaseName);
+    public void Close() => _inner.Close();
+    public IDbCommand CreateCommand() => _inner.CreateCommand();
+    public void Open() => _inner.Open();
+    public void Dispose() => _inner.Dispose();
+}
+
+
+
+
+

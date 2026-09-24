@@ -5,7 +5,7 @@ namespace EricksonLopez.Auditing;
 /// <summary>Specifies how sensitive field values are handled in change tracking records.</summary>
 /// <remarks>
 /// <para>
-/// <see cref="AuditSensitivityPipeline.Apply"/> automatically enforces the following policies:
+/// <see cref="AuditSensitivityPipeline.ApplyAsync"/> automatically enforces the following policies:
 /// </para>
 /// <list type="bullet">
 /// <item><description>
@@ -18,7 +18,7 @@ namespace EricksonLopez.Auditing;
 /// </description></item>
 /// </list>
 /// <para>
-///   <see cref="Hash"/> is NOT automatically applied by <see cref="AuditSensitivityPipeline.Apply"/>.
+///   <see cref="Hash"/> is NOT automatically applied by <see cref="AuditSensitivityPipeline.ApplyAsync"/>.
 ///   To store a one-way hash of a sensitive value, the caller must explicitly call
 ///   <see cref="AuditSensitivityPipeline.HashValue"/> and pass the result as the field value.
 /// </para>
@@ -38,7 +38,7 @@ public enum AuditFieldSensitivity
     /// Replaces the field value with its SHA-256 cryptographic digest to support equality comparison without revealing plaintext.
     /// </summary>
     /// <remarks>
-    /// This value is not automatically applied by <see cref="AuditSensitivityPipeline.Apply"/>.
+    /// This value is not automatically applied by <see cref="AuditSensitivityPipeline.ApplyAsync"/>.
     /// To hash a field value, call <see cref="AuditSensitivityPipeline.HashValue"/> explicitly
     /// and pass the resulting hex string as the change value.
     /// </remarks>

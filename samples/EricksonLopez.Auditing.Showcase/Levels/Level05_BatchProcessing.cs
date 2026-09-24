@@ -132,6 +132,69 @@ public static class Level05_BatchProcessing
             Console.ResetColor();
         }
 
-        Console.WriteLine();
+        // ── 6. Asynchronous Buffered Processing (BufferedAuditStoreDecorator) ─────
+        Console.WriteLine("\n6. Asynchronous Channel Buffering (BufferedAuditStoreDecorator):");
+        var bufferTargetStore = new InMemoryAuditStore();
+        var bufferOptions = new BufferedAuditStoreOptions
+        {
+            Capacity = 100,
+            BatchSize = 10,
+            FlushInterval = TimeSpan.FromMilliseconds(50)
+        };
+
+        await using (var bufferedStore = new BufferedAuditStoreDecorator(bufferTargetStore, bufferOptions))
+        {
+            for (int i = 0; i < 25; i++)
+            {
+                await bufferedStore.AppendAsync(new AuditRecord
+                {
+                    Id = AuditId.NewId(),
+                    OccurredAt = DateTimeOffset.UtcNow,
+                    Actor = AuditActor.System,
+                    Action = AuditAction.Create,
+                    Resource = new AuditResource("SensorReading", $"sensor-{i}"),
+                    Outcome = AuditOutcome.Success,
+                    Context = new AuditContext("tenant-iot", "SensorWorker")
+                });
+            }
+
+            // Await brief window for background channel to flush
+            await Task.Delay(150);
+            Console.WriteLine($"✓ BufferedAuditStoreDecorator drained items via background channel worker.");
+            Console.WriteLine($"  • Buffer Target Store Count: {bufferTargetStore.Count} records.");
+            Console.WriteLine($"  • Buffer Configuration: Capacity={bufferOptions.Capacity}, BatchSize={bufferOptions.BatchSize}, FlushInterval={bufferOptions.FlushInterval.TotalMilliseconds}ms");
+        }
+
+        // ── 7. Transactional Outbox Pattern (OutboxAuditStore & IOutboxMessageService) ──
+        Console.WriteLine("\n7. Transactional Outbox Pattern (EricksonLopez.Auditing.Outbox):");
+        var outboxService = new ShowcaseOutboxMessageService();
+        var outboxStore = new EricksonLopez.Auditing.Outbox.OutboxAuditStore(outboxService);
+
+        var outboxRecord = new AuditRecord
+        {
+            Id = AuditId.NewId(),
+            OccurredAt = DateTimeOffset.UtcNow,
+            Actor = new AuditActor(AuditActorType.User, "usr-checkout-01", "Bob Customer"),
+            Action = AuditAction.Create,
+            Resource = new AuditResource("Order", "ord-9901"),
+            Outcome = AuditOutcome.Success,
+            Context = new AuditContext("tenant-ecommerce", "CheckoutService")
+        };
+
+        await outboxStore.AppendAsync(outboxRecord);
+        Console.WriteLine($"✓ OutboxAuditStore.AppendAsync: Message staged atomically in transactional outbox.");
+        Console.WriteLine($"  • Enqueued EventType: '{outboxService.Messages[0].EventType}'");
+        Console.WriteLine($"  • Serialized Payload Length: {outboxService.Messages[0].Payload.Length} characters (Native AOT-safe JSON).\n");
+    }
+
+    private sealed class ShowcaseOutboxMessageService : EricksonLopez.Auditing.Outbox.IOutboxMessageService
+    {
+        public readonly List<(string EventType, string Payload)> Messages = new();
+
+        public ValueTask AppendMessageAsync(string eventType, string payload, System.Threading.CancellationToken cancellationToken = default)
+        {
+            Messages.Add((eventType, payload));
+            return ValueTask.CompletedTask;
+        }
     }
 }

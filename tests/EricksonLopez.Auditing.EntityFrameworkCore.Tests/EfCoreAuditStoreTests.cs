@@ -9,6 +9,7 @@ using EricksonLopez.Auditing.EntityFrameworkCore;
 using EricksonLopez.Auditing.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 using Xunit;
 
 namespace EricksonLopez.Auditing.EntityFrameworkCore.Tests;
@@ -81,10 +82,10 @@ public sealed class EfCoreAuditStoreTests
         var queryResultB = await store.QueryAsync(new AuditQuery { TenantId = "tenant-B" });
 
         queryResultA.Records.Should().HaveCount(1);
-        queryResultA.Records[0].Context.TenantId.Should().Be("tenant-A");
+        queryResultA.Records[0].Context.TenantId.Value.Should().Be("tenant-A");
 
         queryResultB.Records.Should().HaveCount(1);
-        queryResultB.Records[0].Context.TenantId.Should().Be("tenant-B");
+        queryResultB.Records[0].Context.TenantId.Value.Should().Be("tenant-B");
     }
 
     [Fact]
@@ -161,9 +162,13 @@ public sealed class EfCoreAuditStoreTests
         var store = new EfCoreAuditStore(factory);
         var tenant = "tenant-keyset";
 
+        var baseTime = DateTimeOffset.UtcNow;
         var records = Enumerable.Range(1, 5)
-            .Select(i => AuditRecordBuilder.BuildDefault(tenantId: tenant, resourceId: $"res-{i}"))
-            .OrderBy(r => r.Id)
+            .Select(i => AuditRecordBuilder.Create()
+                .WithTenant(tenant)
+                .WithOccurredAt(baseTime.AddSeconds(i))
+                .WithResource("Order", $"res-{i}")
+                .Build())
             .ToList();
 
         await store.AppendBatchAsync(records);
@@ -172,19 +177,19 @@ public sealed class EfCoreAuditStoreTests
         var page1 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2 });
         page1.Records.Should().HaveCount(2);
         page1.HasMore.Should().BeTrue();
-        page1.NextCursorId.Should().NotBeNull();
+        page1.NextPageToken.Should().NotBeNull();
 
         // Page 2
-        var page2 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2, AfterRecordId = page1.NextCursorId });
+        var page2 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2, ContinuationToken = page1.NextPageToken });
         page2.Records.Should().HaveCount(2);
         page2.HasMore.Should().BeTrue();
-        page2.NextCursorId.Should().NotBeNull();
+        page2.NextPageToken.Should().NotBeNull();
 
         // Page 3 (final)
-        var page3 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2, AfterRecordId = page2.NextCursorId });
+        var page3 = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2, ContinuationToken = page2.NextPageToken });
         page3.Records.Should().HaveCount(1);
         page3.HasMore.Should().BeFalse();
-        page3.NextCursorId.Should().BeNull();
+        page3.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -248,6 +253,16 @@ public sealed class EfCoreAuditStoreTests
         var context = new CustomAuditDbContext(options);
         context.Should().NotBeNull();
         context.AuditRecords.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task QueryAsync_DefaultTenantId_ThrowsArgumentException()
+    {
+        var factory = CreateFactory(nameof(QueryAsync_DefaultTenantId_ThrowsArgumentException));
+        var store = new EfCoreAuditStore(factory);
+
+        Func<Task> act = async () => await store.QueryAsync(new AuditQuery { TenantId = default });
+        await act.Should().ThrowAsync<ArgumentException>().WithParameterName("TenantId");
     }
 
     [Theory]
@@ -408,6 +423,10 @@ public sealed class EfCoreAuditStoreTests
         caus!.GetMaxLength().Should().Be(128);
         caus.IsNullable.Should().BeTrue();
 
+        var idemp = entityType.FindProperty(nameof(AuditRecordEntity.IdempotencyKey));
+        idemp!.GetMaxLength().Should().Be(128);
+        idemp.IsNullable.Should().BeTrue();
+
         var err = entityType.FindProperty(nameof(AuditRecordEntity.ErrorCode));
         err!.GetMaxLength().Should().Be(128);
         err.IsNullable.Should().BeTrue();
@@ -471,7 +490,7 @@ public sealed class EfCoreAuditStoreTests
         var result = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2 });
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -491,6 +510,79 @@ public sealed class EfCoreAuditStoreTests
         await using var ctx = await factory.CreateDbContextAsync();
         var entity = await ctx.AuditRecords.FirstAsync(e => e.Id == record.Id);
         entity.ChangesJson.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AppendAsync_WithSensitivityPipeline_SanitizesRecordBeforePersisting()
+    {
+        var factory = CreateFactory(nameof(AppendAsync_WithSensitivityPipeline_SanitizesRecordBeforePersisting));
+        var pipeline = NSubstitute.Substitute.For<IAuditSensitivityPipeline>();
+        var store = new EfCoreAuditStore(factory, pipeline);
+
+        var original = AuditRecordBuilder.BuildDefault(tenantId: "t-ef-sens");
+        var sanitized = AuditRecordBuilder.BuildDefault(tenantId: "t-ef-sens", resourceId: "SANITIZED-RES");
+
+        pipeline.SanitizeAsync(original, Arg.Any<System.Threading.CancellationToken>()).Returns(sanitized);
+
+        await store.AppendAsync(original);
+
+        await pipeline.Received(1).SanitizeAsync(original, Arg.Any<System.Threading.CancellationToken>());
+        var query = await store.QueryAsync(new AuditQuery { TenantId = "t-ef-sens" });
+        query.Records.Should().HaveCount(1);
+        query.Records[0].Resource.Id.Should().Be("SANITIZED-RES");
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_WithSensitivityPipeline_SanitizesRecordsBeforePersisting()
+    {
+        var factory = CreateFactory(nameof(AppendBatchAsync_WithSensitivityPipeline_SanitizesRecordsBeforePersisting));
+        var pipeline = NSubstitute.Substitute.For<IAuditSensitivityPipeline>();
+        var store = new EfCoreAuditStore(factory, pipeline);
+
+        var r1 = AuditRecordBuilder.BuildDefault(tenantId: "t-ef-batch", resourceId: "r1");
+        var r2 = AuditRecordBuilder.BuildDefault(tenantId: "t-ef-batch", resourceId: "r2");
+        var s1 = AuditRecordBuilder.BuildDefault(tenantId: "t-ef-batch", resourceId: "r1-sanitized");
+        var s2 = AuditRecordBuilder.BuildDefault(tenantId: "t-ef-batch", resourceId: "r2-sanitized");
+
+        pipeline.SanitizeAsync(r1, Arg.Any<System.Threading.CancellationToken>()).Returns(s1);
+        pipeline.SanitizeAsync(r2, Arg.Any<System.Threading.CancellationToken>()).Returns(s2);
+
+        await store.AppendBatchAsync(new[] { r1, r2 });
+
+        await pipeline.Received(1).SanitizeAsync(r1, Arg.Any<System.Threading.CancellationToken>());
+        await pipeline.Received(1).SanitizeAsync(r2, Arg.Any<System.Threading.CancellationToken>());
+
+        var query = await store.QueryAsync(new AuditQuery { TenantId = "t-ef-batch" });
+        query.Records.Should().HaveCount(2);
+        query.Records.Select(r => r.Resource.Id).Should().Contain("r1-sanitized").And.Contain("r2-sanitized");
+    }
+
+    [Fact]
+    public async Task QueryAsync_KeysetPagination_TieBreakingOccurredAt_OrdersByIdAscending()
+    {
+        var factory = CreateFactory(nameof(QueryAsync_KeysetPagination_TieBreakingOccurredAt_OrdersByIdAscending));
+        var store = new EfCoreAuditStore(factory);
+        var tenant = "tenant-tiebreak";
+
+        var timestamp = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
+        var id1 = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var id2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+        var r1 = AuditRecordBuilder.Create().WithId(id1).WithTenant(tenant).WithOccurredAt(timestamp).Build();
+        var r2 = AuditRecordBuilder.Create().WithId(id2).WithTenant(tenant).WithOccurredAt(timestamp).Build();
+
+        await store.AppendBatchAsync(new[] { r2, r1 }); // inserted out of order
+
+        var result = await store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 10 });
+        result.Records.Should().HaveCount(2);
+        result.Records[0].Id.Should().Be(id1); // Ordered by Id ascending, NOT descending!
+        result.Records[1].Id.Should().Be(id2);
+
+        // Continuation token with timestamp and id1: should return id2 (because id2 > id1), but NOT id1!
+        var continuationToken = AuditCursorToken.Create(timestamp, id1);
+        var pageAfterId1 = await store.QueryAsync(new AuditQuery { TenantId = tenant, ContinuationToken = continuationToken, PageSize = 10 });
+        pageAfterId1.Records.Should().HaveCount(1);
+        pageAfterId1.Records[0].Id.Should().Be(id2);
     }
 
     [Fact]
@@ -526,3 +618,7 @@ public sealed class EfCoreAuditStoreTests
         public Task<AuditDbContext> CreateDbContextAsync(System.Threading.CancellationToken cancellationToken = default) => throw new InvalidOperationException("Should not be called.");
     }
 }
+
+
+
+

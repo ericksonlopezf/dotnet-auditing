@@ -1,6 +1,7 @@
 // Copyright © Erickson Lopez. MIT License.
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 
 namespace EricksonLopez.Auditing;
@@ -14,10 +15,10 @@ public sealed class AuditScope : IDisposable
     private static readonly AsyncLocal<AuditScope?> _current = new();
 
     private readonly AuditScope? _parent;
-    private readonly Dictionary<string, string> _metadata;
+    private ImmutableDictionary<string, string> _metadata;
     private bool _disposed;
 
-    private AuditScope(AuditScope? parent, Dictionary<string, string> metadata)
+    private AuditScope(AuditScope? parent, ImmutableDictionary<string, string> metadata)
     {
         _parent = parent;
         _metadata = metadata;
@@ -40,22 +41,22 @@ public sealed class AuditScope : IDisposable
     public static AuditScope Begin(IReadOnlyDictionary<string, string>? initialMetadata = null)
     {
         var parent = _current.Value;
-        var metadata = new Dictionary<string, string>(StringComparer.Ordinal);
+        var builder = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
 
         if (initialMetadata is not null)
         {
             foreach (var kvp in initialMetadata)
             {
-                metadata[kvp.Key] = kvp.Value;
+                builder[kvp.Key] = kvp.Value;
             }
         }
 
-        var scope = new AuditScope(parent, metadata);
+        var scope = new AuditScope(parent, builder.ToImmutable());
         _current.Value = scope;
         return scope;
     }
 
-    /// <summary>Adds or updates a metadata entry within this scope.</summary>
+    /// <summary>Adds or updates a metadata entry within this scope in a thread-safe manner.</summary>
     /// <param name="key">The metadata key to set.</param>
     /// <param name="value">The metadata value to associate with the specified key.</param>
     /// <returns>The current <see cref="AuditScope"/> instance for method chaining.</returns>
@@ -63,7 +64,7 @@ public sealed class AuditScope : IDisposable
     public AuditScope WithMetadata(string key, string value)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
-        _metadata[key] = value;
+        ImmutableInterlocked.Update(ref _metadata, static (dict, pair) => dict.SetItem(pair.Key, pair.Value), (Key: key, Value: value));
         return this;
     }
 

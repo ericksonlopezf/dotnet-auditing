@@ -1,4 +1,11 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # ADR-0003: Database-Level Multi-Tenant Isolation (RLS / Session Context / VPD)
+
+## Status
+Accepted
+
+## Date
+2026-09-04
 
 ## Context
 

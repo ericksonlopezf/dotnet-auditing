@@ -118,14 +118,14 @@ public sealed class DapperAuditStore : IAuditStore
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        ArgumentException.ThrowIfNullOrWhiteSpace(query.TenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query.TenantId.Value, nameof(query.TenantId));
 
         using var connection = _options.ConnectionFactory();
         EnsureOpenConnection(connection);
 
         var conditions = new List<string> { "tenant_id = @TenantId" };
         var dynamicParams = new DynamicParameters();
-        dynamicParams.Add("TenantId", query.TenantId);
+        dynamicParams.Add("TenantId", query.TenantId.Value);
 
         if (!string.IsNullOrWhiteSpace(query.ActorId))
         {
@@ -175,10 +175,11 @@ public sealed class DapperAuditStore : IAuditStore
             dynamicParams.Add("CorrelationId", query.CorrelationId);
         }
 
-        if (query.AfterRecordId.HasValue)
+        if (AuditCursorToken.TryParse(query.ContinuationToken, out var cursorDate, out var cursorId))
         {
-            conditions.Add("id > @AfterRecordId");
-            dynamicParams.Add("AfterRecordId", query.AfterRecordId.Value);
+            conditions.Add("(occurred_at > @CursorDate OR (occurred_at = @CursorDate AND id > @CursorId))");
+            dynamicParams.Add("CursorDate", cursorDate);
+            dynamicParams.Add("CursorId", cursorId);
         }
 
         var whereClause = string.Join(" AND ", conditions);
@@ -210,8 +211,8 @@ public sealed class DapperAuditStore : IAuditStore
         var hasMore = rows.Count > pageSize;
         var pageRows = rows.Take(pageSize).ToList();
         var nextCursor = hasMore
-            ? pageRows[^1].Id
-            : (Guid?)null;
+            ? AuditCursorToken.Create(pageRows[^1].OccurredAt, pageRows[^1].Id)
+            : null;
 
         var records = pageRows.Select(MapRow).ToList();
         return new AuditQueryResult(records, nextCursor, hasMore);
@@ -271,7 +272,7 @@ public sealed class DapperAuditStore : IAuditStore
         var p = new DynamicParameters();
         p.Add("Id", record.Id);
         p.Add("OccurredAt", record.OccurredAt);
-        p.Add("TenantId", record.Context.TenantId);
+        p.Add("TenantId", record.Context.TenantId.Value);
         p.Add("Source", record.Context.Source);
         p.Add("ActorType", (byte)record.Actor.Type);
         p.Add("ActorId", record.Actor.Id);
