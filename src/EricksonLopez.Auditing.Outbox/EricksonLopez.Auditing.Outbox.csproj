@@ -1,0 +1,15 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\EricksonLopez.Auditing.Abstractions\EricksonLopez.Auditing.Abstractions.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <Description>Transactional outbox storage decorator for EricksonLopez.Auditing. Ensures atomic audit persistence alongside business domain events. AOT-compatible.</Description>
+    <PackageTags>$(CommonPackageTags);outbox;transactional-outbox;outbox-pattern;event-driven;messaging;native-aot</PackageTags>
+  </PropertyGroup>
+
+</Project>

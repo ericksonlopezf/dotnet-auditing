@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Quick Start Guide: EricksonLopez.Auditing
 
 Get up and running with **`EricksonLopez.Auditing`** in under 5 minutes.
@@ -23,6 +24,8 @@ dotnet add package EricksonLopez.Auditing.EntityFrameworkCore # EF Core
 dotnet add package EricksonLopez.Auditing.Dapper          # Generic ANSI SQL
 dotnet add package EricksonLopez.Auditing.Testing         # In-memory test doubles
 dotnet add package EricksonLopez.Auditing.OpenTelemetry   # Telemetry spans & metrics
+dotnet add package EricksonLopez.Auditing.AzureKeyVault   # Azure Key Vault KMS
+dotnet add package EricksonLopez.Auditing.Outbox          # Transactional Outbox
 ```
 
 ---
@@ -164,6 +167,6 @@ foreach (AuditRecord entry in result.Records)
 // Keyset cursor seek for next page:
 if (result.HasMore)
 {
-    var nextPage = await _auditStore.QueryAsync(query with { AfterRecordId = result.NextCursorId }, cancellationToken);
+    var nextPage = await _auditStore.QueryAsync(query with { ContinuationToken = result.NextPageToken }, cancellationToken);
 }
 ```

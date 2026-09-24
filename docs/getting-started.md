@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Getting Started with EricksonLopez.Auditing
 
 Complete step-by-step onboarding guide to integrating `EricksonLopez.Auditing` from scratch into a production-grade enterprise application.

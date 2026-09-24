@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using AwesomeAssertions;
 using Xunit;
 
@@ -34,7 +35,7 @@ public sealed class AuditSensitivityPipelineTests
     [InlineData("ApiSecret")]
     [InlineData("Certificate")]
     [InlineData("SecurityAnswer")]
-    public void GlobalDenylist_SuppressesSensitiveFields(string sensitiveField)
+    public async Task GlobalDenylist_SuppressesSensitiveFields(string sensitiveField)
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -42,7 +43,7 @@ public sealed class AuditSensitivityPipelineTests
             new(sensitiveField, "old-value", "new-value")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().BeNull(
             $"field '{sensitiveField}' must be excluded by the global denylist and result in null when all changes are excluded");
@@ -58,7 +59,7 @@ public sealed class AuditSensitivityPipelineTests
     [InlineData("SECRET")]
     [InlineData("creditcardnumber")]
     [InlineData("CREDITCARDNUMBER")]
-    public void GlobalDenylist_IsCaseInsensitive_SuppressesVariants(string fieldVariant)
+    public async Task GlobalDenylist_IsCaseInsensitive_SuppressesVariants(string fieldVariant)
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -66,14 +67,14 @@ public sealed class AuditSensitivityPipelineTests
             new(fieldVariant, "old-secret", "new-secret")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().BeNull(
             $"field variant '{fieldVariant}' must be excluded case-insensitively and return null");
     }
 
     [Fact]
-    public void Pipeline_NonSensitiveField_IsPassedThrough()
+    public async Task Pipeline_NonSensitiveField_IsPassedThrough()
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -81,7 +82,7 @@ public sealed class AuditSensitivityPipelineTests
             new("Status", "Pending", "Approved")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().BeSameAs(changes, "when no changes are filtered or redacted, the original list reference is returned directly");
         result.Should().HaveCount(1);
@@ -91,7 +92,7 @@ public sealed class AuditSensitivityPipelineTests
     }
 
     [Fact]
-    public void Pipeline_FirstNormalSecondDenylisted_PreservesFirstItem()
+    public async Task Pipeline_FirstNormalSecondDenylisted_PreservesFirstItem()
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -100,7 +101,7 @@ public sealed class AuditSensitivityPipelineTests
             new("Password", "secret-old", "secret-new")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().NotBeNull();
         result.Should().NotBeSameAs(changes);
@@ -109,7 +110,7 @@ public sealed class AuditSensitivityPipelineTests
     }
 
     [Fact]
-    public void Pipeline_MixedFields_FiltersSensitiveOnly()
+    public async Task Pipeline_MixedFields_FiltersSensitiveOnly()
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -119,7 +120,7 @@ public sealed class AuditSensitivityPipelineTests
             new("TotalAmount", "100", "150")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().NotBeNull();
         result!.Select(c => c.Field).Should().NotContain("Password");
@@ -128,7 +129,7 @@ public sealed class AuditSensitivityPipelineTests
     }
 
     [Fact]
-    public void Pipeline_AlreadyRedactedChange_IsPreservedAsRedacted()
+    public async Task Pipeline_AlreadyRedactedChange_IsPreservedAsRedacted()
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -136,7 +137,7 @@ public sealed class AuditSensitivityPipelineTests
             AuditChange.Redacted("CardLastFour")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().HaveCount(1);
         result![0].IsRedacted.Should().BeTrue();
@@ -145,7 +146,7 @@ public sealed class AuditSensitivityPipelineTests
     }
 
     [Fact]
-    public void Pipeline_FirstNormalSecondRedacted_BuildsResultCorrectly()
+    public async Task Pipeline_FirstNormalSecondRedacted_BuildsResultCorrectly()
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -155,7 +156,7 @@ public sealed class AuditSensitivityPipelineTests
             new("AnotherNormal", "v1", "v2")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().NotBeNull();
         result!.Count.Should().Be(3);
@@ -168,7 +169,7 @@ public sealed class AuditSensitivityPipelineTests
     }
 
     [Fact]
-    public void Pipeline_MultipleDenylistedFieldsInterleaved_ExcludesAllDenylistedWithoutReintroducingPriorItems()
+    public async Task Pipeline_MultipleDenylistedFieldsInterleaved_ExcludesAllDenylistedWithoutReintroducingPriorItems()
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -180,7 +181,7 @@ public sealed class AuditSensitivityPipelineTests
             new("Role", "User", "Admin")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().NotBeNull();
         result!.Count.Should().Be(3);
@@ -192,7 +193,7 @@ public sealed class AuditSensitivityPipelineTests
     }
 
     [Fact]
-    public void Pipeline_MultipleRedactedFieldsInterleaved_RedactsAllWithoutReintroducingUnredactedPriorItems()
+    public async Task Pipeline_MultipleRedactedFieldsInterleaved_RedactsAllWithoutReintroducingUnredactedPriorItems()
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -204,7 +205,7 @@ public sealed class AuditSensitivityPipelineTests
             new("Role", "User", "Admin")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().NotBeNull();
         result!.Count.Should().Be(5);
@@ -221,7 +222,7 @@ public sealed class AuditSensitivityPipelineTests
     }
 
     [Fact]
-    public void Pipeline_MixedSensitiveAndRedactedInterleaved_ProcessesAllCorrectly()
+    public async Task Pipeline_MixedSensitiveAndRedactedInterleaved_ProcessesAllCorrectly()
     {
         var pipeline = BuildPipeline();
         var changes = new List<AuditChange>
@@ -233,7 +234,7 @@ public sealed class AuditSensitivityPipelineTests
             new("Status", "Active", "Suspended")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().NotBeNull();
         result!.Count.Should().Be(3);
@@ -247,24 +248,25 @@ public sealed class AuditSensitivityPipelineTests
     }
 
     [Fact]
-    public void Pipeline_NullChanges_ReturnsNull()
+    public async Task Pipeline_NullChanges_ReturnsNull()
     {
         var pipeline = BuildPipeline();
-        pipeline.Apply(null).Should().BeNull();
+        var result = await pipeline.ApplyAsync(null, "tenant-a");
+        result.Should().BeNull();
     }
 
     [Fact]
-    public void Pipeline_EmptyChanges_ReturnsEmpty()
+    public async Task Pipeline_EmptyChanges_ReturnsEmpty()
     {
         var pipeline = BuildPipeline();
         var empty = Array.Empty<AuditChange>();
-        var result = pipeline.Apply(empty);
+        var result = await pipeline.ApplyAsync(empty, "tenant-a");
         result.Should().BeSameAs(empty);
         result.Should().BeEmpty();
     }
 
     [Fact]
-    public void Pipeline_CustomDenylistField_IsExcluded()
+    public async Task Pipeline_CustomDenylistField_IsExcluded()
     {
         var pipeline = BuildPipeline(cfg =>
         {
@@ -277,7 +279,7 @@ public sealed class AuditSensitivityPipelineTests
             new("Name", "old-name", "new-name")
         };
 
-        var result = pipeline.Apply(changes);
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
 
         result.Should().HaveCount(1);
         result![0].Field.Should().Be("Name");
@@ -390,4 +392,137 @@ public sealed class AuditSensitivityPipelineTests
         ((int)AuditFieldSensitivity.Redact).Should().Be(2);
         ((int)AuditFieldSensitivity.Hash).Should().Be(3);
     }
+
+    [Fact]
+    public async Task SanitizeAsync_NullRecord_ThrowsArgumentNullException()
+    {
+        var pipeline = BuildPipeline();
+        Func<Task> act = async () => await pipeline.SanitizeAsync(null!);
+        await act.Should().ThrowAsync<ArgumentNullException>().WithParameterName("record");
+    }
+
+    [Fact]
+    public async Task SanitizeAsync_NullOrEmptyChanges_ReturnsSameRecordInstance()
+    {
+        var pipeline = BuildPipeline();
+        var recordNullChanges = AuditRecordBuilder.Create().WithChanges(null).Build();
+        var result1 = await pipeline.SanitizeAsync(recordNullChanges);
+        result1.Should().BeSameAs(recordNullChanges);
+
+        var recordEmptyChanges = AuditRecordBuilder.Create().WithChanges(Array.Empty<AuditChange>()).Build();
+        var result2 = await pipeline.SanitizeAsync(recordEmptyChanges);
+        result2.Should().BeSameAs(recordEmptyChanges);
+    }
+
+    [Fact]
+    public async Task SanitizeAsync_UnmodifiedChanges_ReturnsSameRecordInstance()
+    {
+        var pipeline = BuildPipeline();
+        var originalChanges = new List<AuditChange> { new("NormalField", "OldVal", "NewVal") };
+        var record = AuditRecordBuilder.Create().WithChanges(originalChanges).Build();
+
+        var sanitized = await pipeline.SanitizeAsync(record);
+        sanitized.Should().BeSameAs(record, "when no changes are filtered or modified, the original record reference is returned");
+    }
+
+    [Fact]
+    public async Task SanitizeAsync_ModifiedChanges_ReturnsRecordWithSanitizedChanges()
+    {
+        var pipeline = BuildPipeline();
+        var originalChanges = new List<AuditChange>
+        {
+            new("NormalField", "OldVal", "NewVal"),
+            new("Password", "secret", "newSecret")
+        };
+        var record = AuditRecordBuilder.Create().WithChanges(originalChanges).Build();
+
+        var sanitized = await pipeline.SanitizeAsync(record);
+        sanitized.Should().NotBeSameAs(record);
+        sanitized.Changes.Should().NotBeNull();
+        sanitized.Changes!.Count.Should().Be(1);
+        sanitized.Changes[0].Field.Should().Be("NormalField");
+    }
+
+    [Fact]
+    public async Task ApplyAsync_StringLengthExactBoundary_IsNotTruncated()
+    {
+        var pipeline = BuildPipeline(cfg => cfg.MaxStringLength = 10);
+        var exact10 = "1234567890";
+        var changes = new List<AuditChange>
+        {
+            new("Field1", exact10, exact10)
+        };
+
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
+
+        result.Should().BeSameAs(changes, "a string whose length is exactly equal to MaxStringLength must NOT be truncated");
+        result![0].OldValue.Should().Be(exact10);
+        result[0].NewValue.Should().Be(exact10);
+    }
+
+    [Fact]
+    public async Task ApplyAsync_OnlyOldValueExceedsLimit_TruncatesOldValueOnly()
+    {
+        var pipeline = BuildPipeline(cfg => cfg.MaxStringLength = 5);
+        var changes = new List<AuditChange>
+        {
+            new("Field1", "123456", "123")
+        };
+
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
+
+        result.Should().NotBeNull();
+        result!.Count.Should().Be(1);
+        result[0].OldValue.Should().Be("12345[TRUNCATED]");
+        result[0].NewValue.Should().Be("123");
+        result[0].IsRedacted.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ApplyAsync_OnlyNewValueExceedsLimit_TruncatesNewValueOnly()
+    {
+        var pipeline = BuildPipeline(cfg => cfg.MaxStringLength = 5);
+        var changes = new List<AuditChange>
+        {
+            new("NormalField", "1", "2"),
+            new("Field2", "123", "123456")
+        };
+
+        var result = await pipeline.ApplyAsync(changes, "tenant-a");
+
+        result.Should().NotBeNull();
+        result!.Count.Should().Be(2);
+        result[0].Field.Should().Be("NormalField");
+        result[1].OldValue.Should().Be("123");
+        result[1].NewValue.Should().Be("12345[TRUNCATED]");
+    }
+
+    [Fact]
+    public void HashValue_WithSalt_ComputesCorrectDigest()
+    {
+        const string val = "mySecretPassword";
+        const string salt = "tenantSalt123";
+
+        var hash = AuditSensitivityPipeline.HashValue(val, salt);
+
+        // Verify matches SHA256 of "tenantSalt123:mySecretPassword"
+        var expectedBytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{salt}:{val}"));
+        var expectedHex = Convert.ToHexString(expectedBytes).ToLowerInvariant();
+
+        hash.Should().Be(expectedHex);
+    }
+
+    [Fact]
+    public void KeyProvider_Property_ReturnsConfiguredInstance()
+    {
+        var keyProvider = NSubstitute.Substitute.For<IAuditCryptoKeyProvider>();
+        var pipeline = new AuditSensitivityPipeline(new AuditConfiguration(), keyProvider);
+        pipeline.KeyProvider.Should().BeSameAs(keyProvider);
+
+        var pipelineDefault = new AuditSensitivityPipeline(new AuditConfiguration());
+        pipelineDefault.KeyProvider.Should().BeNull();
+    }
 }
+
+
+

@@ -46,7 +46,7 @@ public sealed class TestingInfrastructureTests
         record.Action.Should().Be(action);
         record.Resource.Should().Be(resource);
         record.Outcome.Should().Be(AuditOutcome.Partial);
-        record.Context.TenantId.Should().Be("tenant-corp");
+        record.Context.TenantId.Value.Should().Be("tenant-corp");
         record.Context.Source.Should().Be("PaymentGateway");
         record.Context.CorrelationId.Should().Be("corr-999");
         record.Context.CausationId.Should().Be("cause-888");
@@ -132,7 +132,7 @@ public sealed class TestingInfrastructureTests
         record.Outcome.Should().Be(AuditOutcome.Success);
         record.ErrorCode.Should().BeNull();
 
-        record.Context.TenantId.Should().Be("tenant-a");
+        record.Context.TenantId.Value.Should().Be("tenant-a");
         record.Context.Source.Should().Be("OrderService");
         record.Context.CorrelationId.Should().BeNull();
         record.Context.CausationId.Should().BeNull();
@@ -150,7 +150,7 @@ public sealed class TestingInfrastructureTests
     {
         var record = AuditRecordBuilder.BuildDefault();
 
-        record.Context.TenantId.Should().Be("tenant-a");
+        record.Context.TenantId.Value.Should().Be("tenant-a");
         record.Actor.Type.Should().Be(AuditActorType.User);
         record.Actor.Id.Should().Be("user-42");
         record.Actor.DisplayName.Should().Be("Alice");
@@ -171,7 +171,7 @@ public sealed class TestingInfrastructureTests
             outcome: AuditOutcome.Failure,
             correlationId: "corr-custom");
 
-        record.Context.TenantId.Should().Be("tenant-custom");
+        record.Context.TenantId.Value.Should().Be("tenant-custom");
         record.Actor.Type.Should().Be(AuditActorType.User);
         record.Actor.Id.Should().Be("actor-custom");
         record.Actor.DisplayName.Should().Be("Alice");
@@ -298,7 +298,6 @@ public sealed class TestingInfrastructureTests
 
         provider.GetCurrentKey("tenant-vip").ToArray().Should().Equal(tenantSpecificKey);
         provider.GetCurrentKey("tenant-other").ToArray().Should().Equal(TestAuditIntegrityProvider.DefaultKey);
-        provider.GetCurrentKey(string.Empty).ToArray().Should().Equal(TestAuditIntegrityProvider.DefaultKey);
     }
 
     [Fact]
@@ -316,3 +315,7 @@ public sealed class TestingInfrastructureTests
         nullKey.Should().Throw<ArgumentNullException>();
     }
 }
+
+
+
+

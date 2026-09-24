@@ -1,13 +1,17 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/EricksonLopez.Auditing/EricksonLopez.Auditing.csproj" />
     <Project Path="src/EricksonLopez.Auditing.Abstractions/EricksonLopez.Auditing.Abstractions.csproj" />
+    <Project Path="src/EricksonLopez.Auditing.Analyzers/EricksonLopez.Auditing.Analyzers.csproj" />
+    <Project Path="src/EricksonLopez.Auditing.AzureKeyVault/EricksonLopez.Auditing.AzureKeyVault.csproj" />
     <Project Path="src/EricksonLopez.Auditing.Dapper/EricksonLopez.Auditing.Dapper.csproj" />
     <Project Path="src/EricksonLopez.Auditing.EntityFrameworkCore/EricksonLopez.Auditing.EntityFrameworkCore.csproj" />
     <Project Path="src/EricksonLopez.Auditing.MongoDb/EricksonLopez.Auditing.MongoDb.csproj" />
     <Project Path="src/EricksonLopez.Auditing.MySql/EricksonLopez.Auditing.MySql.csproj" />
     <Project Path="src/EricksonLopez.Auditing.OpenTelemetry/EricksonLopez.Auditing.OpenTelemetry.csproj" />
     <Project Path="src/EricksonLopez.Auditing.Oracle/EricksonLopez.Auditing.Oracle.csproj" />
+    <Project Path="src/EricksonLopez.Auditing.Outbox/EricksonLopez.Auditing.Outbox.csproj" />
     <Project Path="src/EricksonLopez.Auditing.PostgreSql/EricksonLopez.Auditing.PostgreSql.csproj" />
     <Project Path="src/EricksonLopez.Auditing.SqlServer/EricksonLopez.Auditing.SqlServer.csproj" />
     <Project Path="src/EricksonLopez.Auditing.Sqlite/EricksonLopez.Auditing.Sqlite.csproj" />
@@ -28,6 +32,7 @@
     <Project Path="tests/EricksonLopez.Auditing.Testing.Tests/EricksonLopez.Auditing.Testing.Tests.csproj" />
     <Project Path="tests/EricksonLopez.Auditing.IntegrationTests/EricksonLopez.Auditing.IntegrationTests.csproj" />
     <Project Path="tests/EricksonLopez.Auditing.AotSmokeTest/EricksonLopez.Auditing.AotSmokeTest.csproj" />
+    <Project Path="tests/EricksonLopez.Auditing.Analyzers.Tests/EricksonLopez.Auditing.Analyzers.Tests.csproj" />
   </Folder>
   <Folder Name="/benchmarks/">
     <Project Path="benchmarks/EricksonLopez.Auditing.Benchmarks/EricksonLopez.Auditing.Benchmarks.csproj" />

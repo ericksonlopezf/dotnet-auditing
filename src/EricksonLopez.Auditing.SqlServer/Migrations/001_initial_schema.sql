@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- EricksonLopez.Auditing — Microsoft SQL Server / Azure SQL Schema Migration
--- Version: 1.0.0
+-- Version: 2.0.0
 -- Description:
 --   Creates the audit schema, the records table, security predicate function,
 --   and Security Policy for Row-Level Security (RLS) via SESSION_CONTEXT.
@@ -41,6 +41,7 @@ BEGIN
         [request_id]      NVARCHAR(128)    NULL,
         [ip_address]      VARCHAR(45)      NULL,
         [user_agent]      NVARCHAR(512)    NULL,
+        [idempotency_key] NVARCHAR(128)    NULL,
 
         [changes]         NVARCHAR(MAX)    NULL,
 
@@ -80,6 +81,14 @@ BEGIN
     CREATE NONCLUSTERED INDEX [IX_audit_records_correlation]
         ON [audit].[records] ([correlation_id] ASC)
         WHERE [correlation_id] IS NOT NULL;
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = N'IX_audit_records_chain' AND object_id = OBJECT_ID(N'[audit].[records]'))
+BEGIN
+    CREATE UNIQUE NONCLUSTERED INDEX [IX_audit_records_chain]
+        ON [audit].[records] ([tenant_id] ASC, [previous_hash] ASC)
+        WHERE [previous_hash] IS NOT NULL;
 END
 GO
 

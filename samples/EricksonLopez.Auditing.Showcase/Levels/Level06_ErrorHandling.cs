@@ -78,5 +78,76 @@ public static class Level06_ErrorHandling
         Console.WriteLine("\n✓ ErrorCode Security Invariant: Must never store raw exception messages,");
         Console.WriteLine("  database connection strings, or stack traces, preventing forensic information disclosure.\n");
         Console.ResetColor();
+
+        // ── 3. Active Resilient Decorator Enforcement (FailOpen vs Critical Actions) ──
+        Console.WriteLine("3. Active Resilient Decorator Enforcement (ResilientAuditStoreDecorator):");
+        var failingStore = new FailingAuditStore();
+        var resilientConfig = new AuditConfiguration
+        {
+            DefaultFailureBehavior = AuditFailureBehavior.FailOpen
+        };
+        resilientConfig.CriticalActionCodes.Add("ProcessPayroll");
+
+        var resilientStore = new ResilientAuditStoreDecorator(failingStore, resilientConfig);
+
+        // Scenario A: Non-critical action with FailOpen -> Exception swallowed!
+        var nonCriticalRecord = new AuditRecord
+        {
+            Id = AuditId.NewId(),
+            OccurredAt = DateTimeOffset.UtcNow,
+            Actor = AuditActor.System,
+            Action = AuditAction.Read,
+            Resource = new AuditResource("ProductCatalog", "cat-1"),
+            Outcome = AuditOutcome.Success,
+            Context = new AuditContext("tenant-a", "Storefront")
+        };
+
+        try
+        {
+            await resilientStore.AppendAsync(nonCriticalRecord);
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("✓ FailOpen Policy: Non-critical action ('Read') failure was successfully intercepted and swallowed.");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"✗ Unexpected failure in FailOpen: {ex.Message}");
+        }
+
+        // Scenario B: Critical action ('ProcessPayroll') with FailOpen -> Must rethrow to protect business!
+        var criticalRecord = new AuditRecord
+        {
+            Id = AuditId.NewId(),
+            OccurredAt = DateTimeOffset.UtcNow,
+            Actor = AuditActor.System,
+            Action = new AuditAction("ProcessPayroll"),
+            Resource = new AuditResource("PayrollBatch", "pb-2026-09"),
+            Outcome = AuditOutcome.Success,
+            Context = new AuditContext("tenant-a", "PayrollEngine")
+        };
+
+        try
+        {
+            await resilientStore.AppendAsync(criticalRecord);
+            Console.WriteLine("✗ Critical action failure was swallowed unexpectedly!");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"✓ CriticalAction Protection: Critical action ('ProcessPayroll') rethrew exception as expected: '{ex.Message}'.\n");
+            Console.ResetColor();
+        }
+    }
+
+    private sealed class FailingAuditStore : IAuditStore
+    {
+        public ValueTask AppendAsync(AuditRecord record, System.Threading.CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Simulated database timeout or connectivity failure.");
+
+        public ValueTask AppendBatchAsync(System.Collections.Generic.IReadOnlyList<AuditRecord> records, System.Threading.CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Simulated database batch failure.");
+
+        public ValueTask<AuditQueryResult> QueryAsync(AuditQuery query, System.Threading.CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("Simulated database query failure.");
     }
 }

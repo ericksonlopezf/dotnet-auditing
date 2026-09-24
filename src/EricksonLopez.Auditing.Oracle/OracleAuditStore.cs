@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,14 +17,19 @@ namespace EricksonLopez.Auditing.Oracle;
 public sealed class OracleAuditStore : IAuditStore
 {
     private readonly OracleAuditStoreOptions _options;
+    private readonly IAuditSensitivityPipeline? _sensitivityPipeline;
     private readonly string _qualifiedTable;
 
     /// <summary>Initializes a new instance of the <see cref="OracleAuditStore"/> class.</summary>
     /// <param name="options">The Oracle audit store configuration options.</param>
+    /// <param name="sensitivityPipeline">The optional sensitivity pipeline to sanitize records before persistence.</param>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/></exception>
-    public OracleAuditStore(OracleAuditStoreOptions options)
+    public OracleAuditStore(
+        OracleAuditStoreOptions options,
+        IAuditSensitivityPipeline? sensitivityPipeline = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _sensitivityPipeline = sensitivityPipeline;
         _qualifiedTable = string.IsNullOrEmpty(options.Schema)
             ? options.Table
             : $"{options.Schema}.{options.Table}";
@@ -34,10 +40,23 @@ public sealed class OracleAuditStore : IAuditStore
     {
         ArgumentNullException.ThrowIfNull(record);
 
-        using var connection = _options.ConnectionFactory();
-        await SetSessionContextAsync(connection, record.Context.TenantId);
+        if (_sensitivityPipeline is not null)
+        {
+            record = await _sensitivityPipeline.SanitizeAsync(record, cancellationToken).ConfigureAwait(false);
+        }
 
-        await connection.ExecuteAsync(BuildInsertSql(), ToParameters(record));
+        using var connection = _options.ConnectionFactory();
+        try
+        {
+            await SetSessionContextAsync(connection, record.Context.TenantId, cancellationToken).ConfigureAwait(false);
+
+            var cmd = new CommandDefinition(BuildInsertSql(), ToParameters(record), cancellationToken: cancellationToken);
+            await connection.ExecuteAsync(cmd).ConfigureAwait(false);
+        }
+        finally
+        {
+            await ClearSessionContextAsync(connection).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc/>
@@ -47,6 +66,16 @@ public sealed class OracleAuditStore : IAuditStore
     {
         ArgumentNullException.ThrowIfNull(records);
         if (records.Count == 0) return;
+
+        if (_sensitivityPipeline is not null)
+        {
+            var sanitized = new List<AuditRecord>(records.Count);
+            for (int i = 0; i < records.Count; i++)
+            {
+                sanitized.Add(await _sensitivityPipeline.SanitizeAsync(records[i], cancellationToken).ConfigureAwait(false));
+            }
+            records = sanitized;
+        }
 
         var tenantId = records[0].Context.TenantId;
         for (int i = 1; i < records.Count; i++)
@@ -60,10 +89,21 @@ public sealed class OracleAuditStore : IAuditStore
         }
 
         using var connection = _options.ConnectionFactory();
-        await SetSessionContextAsync(connection, tenantId);
+        await OpenConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            using var transaction = await BeginTransactionAsync(connection, cancellationToken).ConfigureAwait(false);
+            await SetSessionContextAsync(connection, transaction, tenantId, cancellationToken).ConfigureAwait(false);
 
-        var insertSql = BuildInsertSql();
-        await connection.ExecuteAsync(insertSql, records.Select(ToParameters));
+            var insertSql = BuildInsertSql();
+            var cmd = new CommandDefinition(insertSql, records.Select(ToParameters), transaction: transaction, cancellationToken: cancellationToken);
+            await connection.ExecuteAsync(cmd).ConfigureAwait(false);
+            CommitTransaction(transaction);
+        }
+        finally
+        {
+            await ClearSessionContextAsync(connection).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc/>
@@ -80,34 +120,85 @@ public sealed class OracleAuditStore : IAuditStore
         }
 
         using var connection = _options.ConnectionFactory();
-        await SetSessionContextAsync(connection, query.TenantId);
+        try
+        {
+            await SetSessionContextAsync(connection, query.TenantId, cancellationToken).ConfigureAwait(false);
 
-        var (sql, parameters) = BuildQuerySql(query);
+            var (sql, parameters) = BuildQuerySql(query);
 
-        var rows = await connection.QueryAsync<AuditRecordRow>(sql, parameters);
+            var cmd = new CommandDefinition(sql, parameters, cancellationToken: cancellationToken);
+            var rows = await connection.QueryAsync<AuditRecordRow>(cmd).ConfigureAwait(false);
 
-        var list = rows.ToList();
-        var hasMore = list.Count > query.PageSize;
-        if (hasMore) list.RemoveAt(list.Count - 1);
+            var list = rows.ToList();
+            var hasMore = list.Count > query.PageSize;
+            if (hasMore) list.RemoveAt(list.Count - 1);
 
-        var records = list.Select(MapRow).ToList();
-        var nextCursor = hasMore ? records[^1].Id : (Guid?)null;
+            var records = list.Select(MapRow).ToList();
+            var nextCursor = hasMore ? AuditCursorToken.Create(records[^1].OccurredAt, records[^1].Id) : null;
 
-        return new AuditQueryResult(records, nextCursor, hasMore);
+            return new AuditQueryResult(records, nextCursor, hasMore);
+        }
+        finally
+        {
+            await ClearSessionContextAsync(connection).ConfigureAwait(false);
+        }
     }
 
     // ── Session context ───────────────────────────────────────────────────────
 
-    private static async Task SetSessionContextAsync(IDbConnection connection, string tenantId)
+    private static Task SetSessionContextAsync(IDbConnection connection, string tenantId, CancellationToken cancellationToken) =>
+        SetSessionContextAsync(connection, null, tenantId, cancellationToken);
+
+    private static async Task SetSessionContextAsync(IDbConnection connection, IDbTransaction? transaction, string tenantId, CancellationToken cancellationToken)
+    {
+        await OpenConnectionAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        var cmd = new CommandDefinition(
+            "BEGIN DBMS_SESSION.SET_IDENTIFIER(:TenantId); END;",
+            new { TenantId = tenantId },
+            transaction: transaction,
+            cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(cmd).ConfigureAwait(false);
+    }
+
+    private static async Task ClearSessionContextAsync(IDbConnection connection)
+    {
+        if (connection.State != ConnectionState.Open) return;
+
+        var cmd = new CommandDefinition(
+            "BEGIN DBMS_SESSION.CLEAR_IDENTIFIER(); END;",
+            cancellationToken: default);
+        await connection.ExecuteAsync(cmd).ConfigureAwait(false);
+    }
+
+    private static async Task OpenConnectionAsync(IDbConnection connection, CancellationToken cancellationToken)
     {
         if (connection.State != ConnectionState.Open)
         {
-            connection.Open();
+            if (connection is System.Data.Common.DbConnection dbConn)
+            {
+                await dbConn.OpenAsync(cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                connection.Open();
+            }
+        }
+    }
+
+    private static async Task<IDbTransaction> BeginTransactionAsync(IDbConnection connection, CancellationToken cancellationToken)
+    {
+        if (connection is System.Data.Common.DbConnection dbConn)
+        {
+            return await dbConn.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await connection.ExecuteAsync(
-            "BEGIN DBMS_SESSION.SET_IDENTIFIER(:TenantId); END;",
-            new { TenantId = tenantId });
+        return connection.BeginTransaction();
+    }
+
+    private static void CommitTransaction(IDbTransaction transaction)
+    {
+        transaction.Commit();
     }
 
     // ── SQL construction ─────────────────────────────────────────────────────
@@ -120,7 +211,7 @@ public sealed class OracleAuditStore : IAuditStore
             "ACTION_CODE",
             "RESOURCE_TYPE", "RESOURCE_ID", "AGGREGATE_TYPE", "AGGREGATE_ID",
             "OUTCOME", "ERROR_CODE",
-            "CORRELATION_ID", "CAUSATION_ID", "REQUEST_ID", "IP_ADDRESS", "USER_AGENT",
+            "CORRELATION_ID", "CAUSATION_ID", "REQUEST_ID", "IP_ADDRESS", "USER_AGENT", "IDEMPOTENCY_KEY",
             "CHANGES",
             "INTEGRITY_HASH", "PREVIOUS_HASH"
         ) VALUES (
@@ -129,7 +220,7 @@ public sealed class OracleAuditStore : IAuditStore
             :ActionCode,
             :ResourceType, :ResourceId, :AggregateType, :AggregateId,
             :Outcome, :ErrorCode,
-            :CorrelationId, :CausationId, :RequestId, :IpAddress, :UserAgent,
+            :CorrelationId, :CausationId, :RequestId, :IpAddress, :UserAgent, :IdempotencyKey,
             :Changes,
             :IntegrityHash, :PreviousHash
         )
@@ -144,7 +235,7 @@ public sealed class OracleAuditStore : IAuditStore
         };
 
         var p = new DynamicParameters();
-        p.Add("TenantId", query.TenantId);
+        p.Add("TenantId", query.TenantId.Value);
         p.Add("StartDate", query.From ?? DateTimeOffset.UnixEpoch);
 
         if (query.To.HasValue) { where.Add("\"OCCURRED_AT\" <= :EndDate"); p.Add("EndDate", query.To.Value); }
@@ -155,14 +246,15 @@ public sealed class OracleAuditStore : IAuditStore
         if (query.Outcome.HasValue) { where.Add("\"OUTCOME\" = :Outcome"); p.Add("Outcome", (byte)query.Outcome.Value); }
         if (query.CorrelationId is not null) { where.Add("\"CORRELATION_ID\" = :CorrelationId"); p.Add("CorrelationId", query.CorrelationId); }
 
-        if (query.AfterRecordId.HasValue)
+        // Keyset pagination: tuple-style comparison using AND/OR
+        if (AuditCursorToken.TryParse(query.ContinuationToken, out var cursorDate, out var cursorId))
         {
-            var cursorGuidStr = query.AfterRecordId.Value.ToString();
             where.Add($"""
-                ("OCCURRED_AT" > (SELECT "OCCURRED_AT" FROM {_qualifiedTable} WHERE "ID" = :CursorId)
-                 OR ("OCCURRED_AT" = (SELECT "OCCURRED_AT" FROM {_qualifiedTable} WHERE "ID" = :CursorId) AND "ID" > :CursorId))
+                ("OCCURRED_AT" > TO_TIMESTAMP(:CursorDate, 'YYYY-MM-DD HH24:MI:SS.FF6')
+                 OR ("OCCURRED_AT" = TO_TIMESTAMP(:CursorDate, 'YYYY-MM-DD HH24:MI:SS.FF6') AND "ID" > :CursorId))
                 """);
-            p.Add("CursorId", cursorGuidStr);
+            p.Add("CursorDate", cursorDate.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture));
+            p.Add("CursorId", cursorId.ToString("N").ToUpperInvariant());
         }
 
         var sql = $"""
@@ -171,7 +263,7 @@ public sealed class OracleAuditStore : IAuditStore
                    "ACTION_CODE",
                    "RESOURCE_TYPE", "RESOURCE_ID", "AGGREGATE_TYPE", "AGGREGATE_ID",
                    "OUTCOME", "ERROR_CODE",
-                   "CORRELATION_ID", "CAUSATION_ID", "REQUEST_ID", "IP_ADDRESS", "USER_AGENT",
+                   "CORRELATION_ID", "CAUSATION_ID", "REQUEST_ID", "IP_ADDRESS", "USER_AGENT", "IDEMPOTENCY_KEY",
                    "CHANGES" AS "CHANGES_JSON",
                    "INTEGRITY_HASH", "PREVIOUS_HASH"
             FROM {_qualifiedTable}
@@ -190,7 +282,7 @@ public sealed class OracleAuditStore : IAuditStore
         var p = new DynamicParameters();
         p.Add("Id", record.Id.ToString());
         p.Add("OccurredAt", record.OccurredAt);
-        p.Add("TenantId", record.Context.TenantId);
+        p.Add("TenantId", record.Context.TenantId.Value);
         p.Add("Source", record.Context.Source);
         p.Add("ActorType", (byte)record.Actor.Type);
         p.Add("ActorId", record.Actor.Id);
@@ -207,6 +299,7 @@ public sealed class OracleAuditStore : IAuditStore
         p.Add("RequestId", record.Context.RequestId);
         p.Add("IpAddress", record.Context.IpAddress);
         p.Add("UserAgent", record.Context.UserAgent);
+        p.Add("IdempotencyKey", record.Context.IdempotencyKey);
         p.Add("Changes", SerializeChanges(record.Changes));
         p.Add("IntegrityHash", record.IntegrityHash);
         p.Add("PreviousHash", record.PreviousHash);
@@ -246,7 +339,8 @@ public sealed class OracleAuditStore : IAuditStore
                 CausationId: row.CAUSATION_ID,
                 RequestId: row.REQUEST_ID,
                 IpAddress: row.IP_ADDRESS,
-                UserAgent: row.USER_AGENT),
+                UserAgent: row.USER_AGENT,
+                IdempotencyKey: row.IDEMPOTENCY_KEY),
             Changes = changes,
             IntegrityHash = row.INTEGRITY_HASH,
             PreviousHash = row.PREVIOUS_HASH
@@ -295,8 +389,10 @@ public sealed class OracleAuditStore : IAuditStore
         public string? REQUEST_ID { get; set; }
         public string? IP_ADDRESS { get; set; }
         public string? USER_AGENT { get; set; }
+        public string? IDEMPOTENCY_KEY { get; set; }
         public string? CHANGES_JSON { get; set; }
         public string? INTEGRITY_HASH { get; set; }
         public string? PREVIOUS_HASH { get; set; }
     }
 }
+

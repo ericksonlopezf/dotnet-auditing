@@ -9,8 +9,8 @@ public sealed class AuditConfiguration
 {
     /// <summary>
     /// Gets or sets the default failure handling behavior when the audit store fails.
-    /// Defaults to <see cref="AuditFailureBehavior.FailClosed"/>.
     /// </summary>
+    /// <remarks>Defaults to <see cref="AuditFailureBehavior.FailClosed"/>.</remarks>
     public AuditFailureBehavior DefaultFailureBehavior { get; set; } = AuditFailureBehavior.FailClosed;
 
     /// <summary>
@@ -63,4 +63,19 @@ public sealed class AuditConfiguration
 
     /// <summary>Gets or sets the maximum duration to wait before flushing a partially filled batch.</summary>
     public TimeSpan BatchFlushInterval { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Gets or sets the maximum allowed string length for change values.
+    /// </summary>
+    /// <remarks>
+    /// Strings exceeding this length will be truncated to prevent Large Object Heap (LOH) allocations and database exceptions.
+    /// Defaults to 4000 characters. Values are clamped to a maximum limit of 8192 characters.
+    /// </remarks>
+    public int MaxStringLength
+    {
+        get => _maxStringLength;
+        set => _maxStringLength = Math.Min(value, 8192);
+    }
+
+    private int _maxStringLength = 4000;
 }

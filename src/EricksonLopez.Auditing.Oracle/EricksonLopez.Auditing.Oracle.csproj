@@ -1,9 +1,10 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <Description>Oracle Database adapter for EricksonLopez.Auditing. Supports Oracle 19c, 21c, and 23ai with Dapper and Oracle.ManagedDataAccess.Core. AOT-compatible.</Description>
-    <PackageTags>$(CommonPackageTags);oracle;oracle-database;vpd;virtual-private-database;dapper;multi-tenant;native-aot</PackageTags>
+    <PackageTags>$(CommonPackageTags);oracle;vpd;virtual-private-database;dapper;multi-tenant</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

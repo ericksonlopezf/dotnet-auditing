@@ -17,7 +17,7 @@ namespace EricksonLopez.Auditing.PostgreSql.Tests;
 
 public sealed class PostgreSqlUnitTests
 {
-    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider());
+    private readonly HmacAuditIntegrityService _hmac = new(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
 
     [Fact]
     public void Options_DefaultValues()
@@ -25,6 +25,53 @@ public sealed class PostgreSqlUnitTests
         var options = new PostgreSqlAuditStoreOptions();
         options.Schema.Should().Be("audit");
         options.Table.Should().Be("records");
+    }
+
+    [Fact]
+    public void Options_SchemaAndTable_Validation()
+    {
+        var options = new PostgreSqlAuditStoreOptions();
+        options.Schema = "custom_schema";
+        options.Schema.Should().Be("custom_schema");
+
+        Action actNullSchema = () => options.Schema = null!;
+        actNullSchema.Should().Throw<ArgumentNullException>()
+            .WithParameterName("value");
+
+        Action actEmptySchema = () => options.Schema = "";
+        actEmptySchema.Should().Throw<ArgumentException>()
+            .WithMessage("*The value cannot be an empty string*")
+            .WithParameterName("value");
+
+        Action actWsSchema = () => options.Schema = "   ";
+        actWsSchema.Should().Throw<ArgumentException>()
+            .WithMessage("*The value cannot be an empty string or composed entirely of whitespace*")
+            .WithParameterName("value");
+
+        Action actInvalidSchema = () => options.Schema = "invalid-schema!";
+        actInvalidSchema.Should().Throw<ArgumentException>()
+            .WithParameterName("value");
+
+        options.Table = "custom_table";
+        options.Table.Should().Be("custom_table");
+
+        Action actNullTable = () => options.Table = null!;
+        actNullTable.Should().Throw<ArgumentNullException>()
+            .WithParameterName("value");
+
+        Action actEmptyTable = () => options.Table = "";
+        actEmptyTable.Should().Throw<ArgumentException>()
+            .WithMessage("*The value cannot be an empty string*")
+            .WithParameterName("value");
+
+        Action actWsTable = () => options.Table = "   ";
+        actWsTable.Should().Throw<ArgumentException>()
+            .WithMessage("*The value cannot be an empty string or composed entirely of whitespace*")
+            .WithParameterName("value");
+
+        Action actInvalidTable = () => options.Table = "invalid-table!";
+        actInvalidTable.Should().Throw<ArgumentException>()
+            .WithParameterName("value");
     }
 
     [Fact]
@@ -56,6 +103,7 @@ public sealed class PostgreSqlUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
 
@@ -267,7 +315,7 @@ public sealed class PostgreSqlUnitTests
             ResourceId = "doc-99",
             Outcome = AuditOutcome.Failure,
             CorrelationId = "corr-555",
-            AfterRecordId = cursorId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId),
             PageSize = 50
         };
 
@@ -304,7 +352,7 @@ public sealed class PostgreSqlUnitTests
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -400,7 +448,7 @@ public sealed class PostgreSqlUnitTests
 
         queryResult.Records.Should().HaveCount(2);
         queryResult.HasMore.Should().BeTrue();
-        queryResult.NextCursorId.Should().Be(r2Id);
+        EricksonLopez.Auditing.AuditCursorToken.TryParse(queryResult.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(r2Id);
 
         var first = queryResult.Records[0];
         first.Id.Should().Be(r1Id);
@@ -494,12 +542,12 @@ public sealed class PostgreSqlUnitTests
         {
             TenantId = "tenant-cursor",
             From = fromDate,
-            AfterRecordId = cursorId
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId)
         });
 
         var queryCmd = fakeConn.ExecutedCommands[1];
         queryCmd.CommandText.Should().Contain("(occurred_at, id) > (");
-        queryCmd.CommandText.Should().Contain("WHERE id = @CursorId");
+        queryCmd.CommandText.Should().Contain("(@CursorDate, @CursorId)");
         queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId);
     }
 
@@ -593,7 +641,7 @@ public sealed class PostgreSqlUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -655,7 +703,7 @@ public sealed class PostgreSqlUnitTests
     [Fact]
     public async Task Store_And_Verifier_WithClosedAndOpenConnections_BehaveCorrectly()
     {
-        var closedConn = new FakeDbConnection { EnforceOpenOnCreateCommand = true };
+        var closedConn = new FakeDbConnection();
         closedConn.Close();
         var store = new PostgreSqlAuditStore(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => closedConn });
         var verifier = new PostgreSqlAuditIntegrityVerifier(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => closedConn }, _hmac);
@@ -678,4 +726,248 @@ public sealed class PostgreSqlUnitTests
         var storeOpen = new PostgreSqlAuditStore(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => openConn });
         await storeOpen.AppendAsync(r);
     }
+
+    private sealed class NonDbConnectionWrapper : IDbConnection
+    {
+        private readonly FakeDbConnection _inner;
+        public NonDbConnectionWrapper(FakeDbConnection inner) => _inner = inner;
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public string ConnectionString { get => _inner.ConnectionString ?? string.Empty; set => _inner.ConnectionString = value ?? string.Empty; }
+        public int ConnectionTimeout => _inner.ConnectionTimeout;
+        public string Database => _inner.Database;
+        public ConnectionState State => _inner.State;
+        public IDbTransaction BeginTransaction() => _inner.BeginTransaction();
+        public IDbTransaction BeginTransaction(IsolationLevel il) => _inner.BeginTransaction(il);
+        public void ChangeDatabase(string databaseName) => _inner.ChangeDatabase(databaseName);
+        public void Close() => _inner.Close();
+        public IDbCommand CreateCommand() => _inner.CreateCommand();
+        public void Open() => _inner.Open();
+        public void Dispose() => _inner.Dispose();
+    }
+
+    private sealed class TestSensitivityPipeline : IAuditSensitivityPipeline
+    {
+        public int SanitizeCount { get; private set; }
+
+        public ValueTask<AuditRecord> SanitizeAsync(AuditRecord record, CancellationToken cancellationToken = default)
+        {
+            SanitizeCount++;
+            return ValueTask.FromResult(record);
+        }
+
+        public ValueTask<IReadOnlyList<AuditChange>?> ApplyAsync(IReadOnlyList<AuditChange>? changes, string tenantId, CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(changes);
+        }
+    }
+
+    [Fact]
+    public void PostgreSqlAuditStoreOptions_SchemaAndTable_Validation()
+    {
+        var options = new PostgreSqlAuditStoreOptions();
+        options.Schema.Should().Be("audit");
+        options.Table.Should().Be("records");
+
+        options.Schema = "custom_schema";
+        options.Schema.Should().Be("custom_schema");
+        options.Table = "custom_table";
+        options.Table.Should().Be("custom_table");
+
+        Action actEmptySchema = () => options.Schema = "";
+        actEmptySchema.Should().Throw<ArgumentException>();
+
+        Action actWhitespaceSchema = () => options.Schema = "   ";
+        actWhitespaceSchema.Should().Throw<ArgumentException>();
+
+        Action actInvalidSchema = () => options.Schema = "invalid-schema!";
+        actInvalidSchema.Should().Throw<ArgumentException>()
+            .WithMessage("*is not a valid SQL identifier*")
+            .WithParameterName("value");
+
+        Action actEmptyTable = () => options.Table = "";
+        actEmptyTable.Should().Throw<ArgumentException>();
+
+        Action actWhitespaceTable = () => options.Table = "   ";
+        actWhitespaceTable.Should().Throw<ArgumentException>();
+
+        Action actInvalidTable = () => options.Table = "invalid-table!";
+        actInvalidTable.Should().Throw<ArgumentException>()
+            .WithMessage("*is not a valid SQL identifier*")
+            .WithParameterName("value");
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_EmptyBatch_ReturnsWithoutExecuting()
+    {
+        var conn = new FakeDbConnection();
+        var store = new PostgreSqlAuditStore(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => conn });
+        await store.AppendBatchAsync(Array.Empty<AuditRecord>());
+        conn.ExecutedCommands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Append_And_AppendBatch_WithSensitivityPipeline_SanitizesRecords()
+    {
+        var conn = new FakeDbConnection();
+        var pipeline = new TestSensitivityPipeline();
+        var store = new PostgreSqlAuditStore(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => conn }, pipeline);
+
+        var r = AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens");
+        await store.AppendAsync(r);
+        pipeline.SanitizeCount.Should().Be(1);
+
+        var records = new[]
+        {
+            AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens"),
+            AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens")
+        };
+        await store.AppendBatchAsync(records);
+        pipeline.SanitizeCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_WithNonDbConnection_OpensAndBeginsTransaction()
+    {
+        var innerConn = new FakeDbConnection();
+        innerConn.Close();
+        var wrapper = new NonDbConnectionWrapper(innerConn);
+        var store = new PostgreSqlAuditStore(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => wrapper });
+
+        var records = new[] { AuditRecordBuilder.BuildDefault(tenantId: "tenant-nondb") };
+        await store.AppendBatchAsync(records);
+        innerConn.ExecutedCommands.Should().Contain(c => c.CommandText.Contains("INSERT INTO"));
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_WithNonDbConnection_AlreadyOpen_DoesNotCallOpen()
+    {
+        var innerConn = new FakeDbConnection();
+        innerConn.Open();
+        var wrapper = new NonDbConnectionWrapper(innerConn);
+        var store = new PostgreSqlAuditStore(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => wrapper });
+
+        var records = new[] { AuditRecordBuilder.BuildDefault(tenantId: "tenant-nondb") };
+        await store.AppendBatchAsync(records);
+        innerConn.ExecutedCommands.Should().Contain(c => c.CommandText.Contains("INSERT INTO"));
+    }
+
+    [Fact]
+    public async Task Verifier_WithNonDbConnection_OpensConnection()
+    {
+        var innerConn = new FakeDbConnection();
+        innerConn.Close();
+        var wrapper = new NonDbConnectionWrapper(innerConn);
+        var verifier = new PostgreSqlAuditIntegrityVerifier(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => wrapper }, _hmac);
+
+        var r = AuditRecordBuilder.BuildDefault(tenantId: "tenant-nondb");
+        var hash = _hmac.ComputeHash(r, null);
+        r = r with { IntegrityHash = hash };
+
+        innerConn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(r));
+        var result = await verifier.VerifyChainAsync("tenant-nondb", DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow);
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Verifier_RecordsWithChanges_IncludingRedacted_VerifyCorrectly()
+    {
+        var conn = new FakeDbConnection();
+        var r = AuditRecordBuilder.Create()
+            .WithTenant("tenant-changes")
+            .WithAction(AuditAction.Update)
+            .WithResource("Invoice", "inv-1")
+            .AddChange("amount", "100", "200", isRedacted: false)
+            .AddRedactedChange("ssn")
+            .Build();
+
+        var hash = _hmac.ComputeHash(r, null);
+        var signed = r with { IntegrityHash = hash, PreviousHash = null };
+
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(signed));
+        var verifier = new PostgreSqlAuditIntegrityVerifier(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => conn }, _hmac);
+
+        var result = await verifier.VerifyChainAsync("tenant-changes", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
+        result.IsValid.Should().BeTrue();
+        result.VerifiedCount.Should().Be(1);
+        conn.CreatedTransactions.Should().ContainSingle(t => t.Committed);
+    }
+
+    [Fact]
+    public async Task QueryAsync_WithContinuationToken_SetsCursorDateAndCursorIdParameters()
+    {
+        var conn = new FakeDbConnection();
+        var store = new PostgreSqlAuditStore(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => conn });
+        var cursorId = Guid.NewGuid();
+        var cursorDate = DateTimeOffset.FromUnixTimeMilliseconds(1700000000000);
+
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(Array.Empty<AuditRecord>()));
+
+        var query = new AuditQuery
+        {
+            TenantId = "tenant-cursor",
+            ContinuationToken = AuditCursorToken.Create(cursorDate, cursorId)
+        };
+
+        var result = await store.QueryAsync(query);
+        result.Records.Should().BeEmpty();
+
+        conn.ExecutedCommands.Should().Contain(c => c.CommandText.Contains("(occurred_at, id) > (@CursorDate, @CursorId)"));
+        var queryCmd = conn.ExecutedCommands.First(c => c.CommandText.Contains("(occurred_at, id) > (@CursorDate, @CursorId)"));
+        queryCmd.Parameters["CursorDate"].Value.Should().Be(cursorDate);
+        queryCmd.Parameters["CursorId"].Value.Should().Be(cursorId);
+        conn.CreatedTransactions.Should().OnlyContain(t => t.Committed);
+    }
+
+    [Fact]
+    public async Task Verifier_VerifyChainAsync_CancellationDuringIteration_Throws()
+    {
+        var conn = new FakeDbConnection { EnforceAsyncTransaction = true };
+        var r = AuditRecordBuilder.BuildDefault("tenant-cancelling");
+        var hash = _hmac.ComputeHash(r, null);
+        var signed = r with { IntegrityHash = hash };
+
+        using var cts = new CancellationTokenSource();
+        conn.ReaderQueues.Enqueue(_ =>
+        {
+            cts.Cancel();
+            return FakeDbDataReaderFactory.Create(signed);
+        });
+
+        var verifier = new PostgreSqlAuditIntegrityVerifier(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => conn }, _hmac);
+        Func<Task> act = async () => await verifier.VerifyChainAsync("tenant-cancelling", DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow, cts.Token);
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
+    public async Task Verifier_RecordsWithNullAndEmptyChangesJson_VerifyCorrectly()
+    {
+        var conn = new FakeDbConnection { EnforceAsyncTransaction = true };
+        var r = AuditRecordBuilder.Create()
+            .WithTenant("tenant-raw-changes")
+            .WithAction(AuditAction.Create)
+            .WithResource("Order", "ord-1")
+            .Build();
+
+        var hash = _hmac.ComputeHash(r, null);
+        var signed = r with { IntegrityHash = hash, PreviousHash = null };
+
+        // Test with raw string "null"
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.CreateWithRawChanges(signed, "null", isStringId: false, isStringDate: false));
+        var verifier = new PostgreSqlAuditIntegrityVerifier(new PostgreSqlAuditStoreOptions { ConnectionFactory = () => conn }, _hmac);
+
+        var result = await verifier.VerifyChainAsync("tenant-raw-changes", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
+        result.IsValid.Should().BeTrue();
+        result.VerifiedCount.Should().Be(1);
+
+        // Test with raw string "[]"
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.CreateWithRawChanges(signed, "[]", isStringId: false, isStringDate: false));
+        var resultEmpty = await verifier.VerifyChainAsync("tenant-raw-changes", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
+        resultEmpty.IsValid.Should().BeTrue();
+        resultEmpty.VerifiedCount.Should().Be(1);
+    }
 }
+
+
+
+
+

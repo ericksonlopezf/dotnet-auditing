@@ -95,6 +95,11 @@ public sealed class MongoAuditRecordDocument
     [BsonIgnoreIfNull]
     public string? UserAgent { get; set; }
 
+    /// <summary>Gets or sets the optional idempotency key.</summary>
+    [BsonElement("idempotencyKey")]
+    [BsonIgnoreIfNull]
+    public string? IdempotencyKey { get; set; }
+
     /// <summary>Gets or sets the collection of field-level changes captured in the record.</summary>
     [BsonElement("changes")]
     [BsonIgnoreIfNull]

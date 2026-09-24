@@ -8,13 +8,6 @@ using EricksonLopez.Auditing;
 
 namespace EricksonLopez.Auditing.Tests.Common;
 
-[JsonSerializable(typeof(List<FakeChangeDto>))]
-[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
-[ExcludeFromCodeCoverage]
-internal sealed partial class FakeDbJsonContext : JsonSerializerContext { }
-
-internal sealed record FakeChangeDto(string Field, string? OldValue, string? NewValue, bool IsRedacted);
-
 [ExcludeFromCodeCoverage]
 internal static class FakeDbDataReaderFactory
 {
@@ -117,6 +110,38 @@ internal static class FakeDbDataReaderFactory
         return new FakeDbDataReader(columns, rows);
     }
 
+    public static FakeDbDataReader CreateWithRawChanges(AuditRecord record, string? rawChangesJson, bool isStringId = false, bool isStringDate = false, bool isOracle = false)
+    {
+        object idVal = isStringId ? record.Id.ToString("D") : record.Id;
+        object dateVal = isStringDate ? record.OccurredAt.ToString("O") : (isOracle ? (object)record.OccurredAt : record.OccurredAt.UtcDateTime);
+        var row = new object?[]
+        {
+            idVal,
+            dateVal,
+            record.Context.TenantId,
+            record.Context.Source,
+            (byte)record.Actor.Type,
+            record.Actor.Id,
+            record.Actor.DisplayName,
+            record.Action.Code,
+            record.Resource.Type,
+            record.Resource.Id,
+            record.Resource.AggregateType,
+            record.Resource.AggregateId,
+            (byte)record.Outcome,
+            record.ErrorCode,
+            record.Context.CorrelationId,
+            record.Context.CausationId,
+            record.Context.RequestId,
+            record.Context.IpAddress,
+            record.Context.UserAgent,
+            rawChangesJson,
+            record.IntegrityHash,
+            record.PreviousHash
+        };
+        return new FakeDbDataReader(isOracle ? OracleColumns : StandardColumns, new List<object?[]> { row });
+    }
+
     private static string? SerializeChanges(IReadOnlyList<AuditChange>? changes)
     {
         if (changes == null || changes.Count == 0) return null;
@@ -129,3 +154,6 @@ internal static class FakeDbDataReaderFactory
         return JsonSerializer.Serialize(dtos, FakeDbJsonContext.Default.ListFakeChangeDto);
     }
 }
+
+
+

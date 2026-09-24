@@ -1,4 +1,11 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # ADR-0007: Keyset Pagination for O(1) Large Scale Queries
+
+## Status
+Accepted
+
+## Date
+2026-09-04
 
 ## Context
 
@@ -6,7 +13,7 @@ Audit tables routinely accumulate hundreds of millions of records. Traditional o
 
 ## Decision
 
-Deprecate and remove `Skip` and `Take` from `AuditQuery`. Replace them with cursor-based Keyset Pagination using `AuditQuery.AfterRecordId` and `AuditQuery.PageSize`. Storage queries seek directly on the composite index `(tenant_id, occurred_at DESC, id DESC)`.
+Deprecate and remove `Skip` and `Take` from `AuditQuery`. Replace them with cursor-based Keyset Pagination using `AuditQuery.ContinuationToken` and `AuditQuery.PageSize`. Storage queries seek directly on the composite index `(tenant_id, occurred_at DESC, id DESC)`. The next page cursor is returned as `AuditQueryResult.NextPageToken` (an opaque base64-encoded token produced by `AuditCursorToken.Create`). To advance to the next page, set `ContinuationToken = result.NextPageToken` in the subsequent query.
 
 ## Consequences
 

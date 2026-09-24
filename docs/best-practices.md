@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Best Practices & Security Guidelines: EricksonLopez.Auditing
 
 Engineering guidelines and security recommendations for maintaining forensic data integrity, compliance readiness, and maximum performance in mission-critical environments.
@@ -29,7 +30,7 @@ Engineering guidelines and security recommendations for maintaining forensic dat
 
 ### 2.1 Keyset Pagination Over Traditional Offsets
 * **Never use OFFSET on high-volume audit tables:** Offset queries scan and discard $N$ rows. In tables with millions of records, `OFFSET 50000` causes severe table scans.
-* Use `AuditQuery.AfterRecordId` for $O(1)$ index seek pagination using the composite index `(tenant_id, occurred_at DESC, id DESC)`.
+* Use `AuditQuery.ContinuationToken` for $O(1)$ index seek pagination using the composite index `(tenant_id, occurred_at DESC, id DESC)`. Set it to the `NextPageToken` from the previous `AuditQueryResult`.
 
 ### 2.2 Batch Insertion with `AppendBatchAsync()`
 * In queue workers, event stream consumers (Kafka/RabbitMQ), and batch ETL jobs, group records by `TenantId` and invoke `AppendBatchAsync()`.

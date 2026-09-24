@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
@@ -6,7 +7,7 @@
     <RootNamespace>EricksonLopez.Auditing.Dapper</RootNamespace>
     <PackageId>EricksonLopez.Auditing.Dapper</PackageId>
     <Description>Generic database-agnostic Dapper adapter for EricksonLopez.Auditing. Provides high-performance audit trail persistence over any ADO.NET IDbConnection using Dapper.</Description>
-    <PackageTags>$(CommonPackageTags);dapper;micro-orm;sql;database-agnostic;native-aot</PackageTags>
+    <PackageTags>$(CommonPackageTags);dapper;micro-orm;database-agnostic</PackageTags>
     <IsPackable>true</IsPackable>
   </PropertyGroup>
 

@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- EricksonLopez.Auditing — MySQL 8.0+ / MariaDB 10.5+ Schema Migration
--- Version: 1.0.0
+-- Version: 2.0.0
 -- Description:
 --   Creates the audit_records table and indexes optimized for tenant-scoped queries.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `audit_records` (
     `request_id`      VARCHAR(128)    NULL,
     `ip_address`      VARCHAR(45)     NULL,
     `user_agent`      VARCHAR(512)    NULL,
+    `idempotency_key` VARCHAR(128)    NULL,
 
     `changes`         JSON            NULL,
 
@@ -52,3 +53,6 @@ CREATE INDEX `ix_audit_records_resource`
 
 CREATE INDEX `ix_audit_records_correlation`
     ON `audit_records` (`correlation_id`);
+
+CREATE UNIQUE INDEX `ix_audit_chain`
+    ON `audit_records` (`tenant_id`, `previous_hash`);

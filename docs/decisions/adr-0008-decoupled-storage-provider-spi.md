@@ -1,4 +1,11 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # ADR-0008: Decoupled Storage Provider Architecture (SPI Pattern)
+
+## Status
+Accepted
+
+## Date
+2026-09-04
 
 ## Context
 

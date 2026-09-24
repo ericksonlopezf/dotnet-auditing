@@ -12,31 +12,46 @@ namespace EricksonLopez.Auditing.MongoDb;
 public sealed class MongoAuditStore : IAuditStore
 {
     private readonly IMongoCollection<MongoAuditRecordDocument> _collection;
+    private readonly IAuditSensitivityPipeline? _sensitivityPipeline;
 
     /// <summary>Initializes a new instance of the <see cref="MongoAuditStore"/> class with a MongoDB collection.</summary>
     /// <param name="collection">The MongoDB collection used to persist audit records.</param>
+    /// <param name="sensitivityPipeline">The optional sensitivity pipeline to sanitize records before persistence.</param>
     /// <exception cref="ArgumentNullException"><paramref name="collection"/> is <see langword="null"/></exception>
-    public MongoAuditStore(IMongoCollection<MongoAuditRecordDocument> collection)
+    public MongoAuditStore(
+        IMongoCollection<MongoAuditRecordDocument> collection,
+        IAuditSensitivityPipeline? sensitivityPipeline = null)
     {
         _collection = collection ?? throw new ArgumentNullException(nameof(collection));
+        _sensitivityPipeline = sensitivityPipeline;
     }
 
     /// <summary>Initializes a new instance of the <see cref="MongoAuditStore"/> class with a database and configuration options.</summary>
     /// <param name="database">The MongoDB database hosting the audit collection.</param>
     /// <param name="options">The configuration options for the MongoDB audit store.</param>
+    /// <param name="sensitivityPipeline">The optional sensitivity pipeline to sanitize records before persistence.</param>
     /// <exception cref="ArgumentNullException"><paramref name="database"/> or <paramref name="options"/> is <see langword="null"/></exception>
-    public MongoAuditStore(IMongoDatabase database, MongoAuditStoreOptions options)
+    public MongoAuditStore(
+        IMongoDatabase database,
+        MongoAuditStoreOptions options,
+        IAuditSensitivityPipeline? sensitivityPipeline = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(options);
 
         _collection = database.GetCollection<MongoAuditRecordDocument>(options.CollectionName);
+        _sensitivityPipeline = sensitivityPipeline;
     }
 
     /// <inheritdoc/>
     public async ValueTask AppendAsync(AuditRecord record, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(record);
+
+        if (_sensitivityPipeline is not null)
+        {
+            record = await _sensitivityPipeline.SanitizeAsync(record, cancellationToken).ConfigureAwait(false);
+        }
 
         var doc = ToDocument(record);
         await _collection.InsertOneAsync(doc, cancellationToken: cancellationToken);
@@ -49,6 +64,16 @@ public sealed class MongoAuditStore : IAuditStore
         if (records.Count == 0)
             return;
 
+        if (_sensitivityPipeline is not null)
+        {
+            var sanitized = new List<AuditRecord>(records.Count);
+            for (int i = 0; i < records.Count; i++)
+            {
+                sanitized.Add(await _sensitivityPipeline.SanitizeAsync(records[i], cancellationToken).ConfigureAwait(false));
+            }
+            records = sanitized;
+        }
+
         var docs = records.Select(ToDocument).ToList();
         await _collection.InsertManyAsync(docs, cancellationToken: cancellationToken);
     }
@@ -57,10 +82,10 @@ public sealed class MongoAuditStore : IAuditStore
     public async ValueTask<AuditQueryResult> QueryAsync(AuditQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        ArgumentException.ThrowIfNullOrWhiteSpace(query.TenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query.TenantId.Value, nameof(query.TenantId));
 
         var builder = Builders<MongoAuditRecordDocument>.Filter;
-        var filter = builder.Eq(x => x.TenantId, query.TenantId);
+        var filter = builder.Eq(x => x.TenantId, query.TenantId.Value);
 
         if (!string.IsNullOrWhiteSpace(query.ActorId))
             filter &= builder.Eq(x => x.ActorId, query.ActorId);
@@ -86,19 +111,28 @@ public sealed class MongoAuditStore : IAuditStore
         if (!string.IsNullOrWhiteSpace(query.CorrelationId))
             filter &= builder.Eq(x => x.CorrelationId, query.CorrelationId);
 
-        if (query.AfterRecordId.HasValue)
-            filter &= builder.Gt(x => x.Id, query.AfterRecordId.Value);
+        if (AuditCursorToken.TryParse(query.ContinuationToken, out var cursorDate, out var cursorId))
+        {
+            var keysetFilter = builder.Or(
+                builder.Gt(x => x.OccurredAt, cursorDate.UtcDateTime),
+                builder.And(
+                    builder.Eq(x => x.OccurredAt, cursorDate.UtcDateTime),
+                    builder.Gt(x => x.Id, cursorId)
+                )
+            );
+            filter &= keysetFilter;
+        }
 
         var pageSize = Math.Clamp(query.PageSize, 1, 1000);
 
         var docs = await _collection.Find(filter)
-            .SortBy(x => x.Id)
+            .SortBy(x => x.OccurredAt).ThenBy(x => x.Id)
             .Limit(pageSize + 1)
             .ToListAsync(cancellationToken);
 
         var hasMore = docs.Count > pageSize;
         var pageDocs = docs.Take(pageSize).ToList();
-        var nextCursor = hasMore ? pageDocs[^1].Id : (Guid?)null;
+        var nextCursor = hasMore ? AuditCursorToken.Create(new DateTimeOffset(pageDocs[^1].OccurredAt, TimeSpan.Zero), pageDocs[^1].Id) : null;
 
         var records = pageDocs.Select(ToRecord).ToList();
         return new AuditQueryResult(records, nextCursor, hasMore);
@@ -139,6 +173,7 @@ public sealed class MongoAuditStore : IAuditStore
             RequestId = record.Context.RequestId,
             IpAddress = record.Context.IpAddress,
             UserAgent = record.Context.UserAgent,
+            IdempotencyKey = record.Context.IdempotencyKey,
             Changes = changes,
             IntegrityHash = record.IntegrityHash,
             PreviousHash = record.PreviousHash
@@ -161,7 +196,7 @@ public sealed class MongoAuditStore : IAuditStore
             Action = new AuditAction(doc.ActionCode),
             Resource = new AuditResource(doc.ResourceType, doc.ResourceId, doc.AggregateType, doc.AggregateId),
             Outcome = (AuditOutcome)doc.Outcome,
-            Context = new AuditContext(doc.TenantId, doc.Source, doc.CorrelationId, doc.CausationId, doc.RequestId, doc.IpAddress, doc.UserAgent),
+            Context = new AuditContext(doc.TenantId, doc.Source, doc.CorrelationId, doc.CausationId, doc.RequestId, doc.IpAddress, doc.UserAgent, doc.IdempotencyKey),
             Changes = changes,
             ErrorCode = doc.ErrorCode,
             IntegrityHash = doc.IntegrityHash,
@@ -169,3 +204,4 @@ public sealed class MongoAuditStore : IAuditStore
         };
     }
 }
+

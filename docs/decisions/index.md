@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Architecture Decision Records (ADRs)
 
 This directory documents the significant architectural decisions made in the `EricksonLopez.Auditing` ecosystem following the standard ADR format.
@@ -18,4 +19,6 @@ This directory documents the significant architectural decisions made in the `Er
 | [ADR-0008](adr-0008-decoupled-storage-provider-spi.md) | Decoupled Storage Provider Architecture (SPI Pattern) | **Accepted** | 2026-08-26 |
 | [ADR-0009](adr-0009-modular-test-suite-and-mutation-isolation.md) | Modular Test Suite & Mutation Testing Isolation | **Accepted** | 2026-08-26 |
 | [ADR-0010](adr-0010-stryker-equivalent-mutants-and-compiler-exclusions.md) | Stryker Equivalent Mutants & Compiler Exclusions | **Accepted** | 2026-08-26 |
+| [ADR-0011](adr-0011-transactional-outbox-and-channel-buffering.md) | Transactional Outbox Pattern and Asynchronous Channel Buffering | **Accepted** | 2026-09-14 |
+| [ADR-0012](adr-0012-cloud-kms-and-gdpr-crypto-shredding.md) | Cloud KMS Integration and GDPR Crypto-Shredding (`IAuditCryptoKeyProvider`) | **Accepted** | 2026-09-14 |
 
