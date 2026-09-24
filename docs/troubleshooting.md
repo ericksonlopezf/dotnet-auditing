@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Troubleshooting Guide: EricksonLopez.Auditing
 
 Diagnostic procedures and solutions for common runtime exceptions and configuration errors encountered when integrating `EricksonLopez.Auditing`.

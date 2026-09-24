@@ -17,3 +17,6 @@ internal sealed class FakeDbTransaction : DbTransaction
     public override void Commit() => Committed = true;
     public override void Rollback() => RolledBack = true;
 }
+
+
+

@@ -19,10 +19,11 @@ namespace EricksonLopez.Auditing.Sqlite.Tests;
 public sealed class SqliteUnitTests
 {
     private static HmacAuditIntegrityService CreateHmacService() =>
-        new(new TestAuditIntegrityProvider());
+        new(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
 
     private static SqliteAuditStore CreateStore(FakeDbConnection connection, string? table = null)
     {
+        connection.EnforceAsyncTransaction = true;
         var options = new SqliteAuditStoreOptions
         {
             ConnectionFactory = () => connection
@@ -265,7 +266,7 @@ public sealed class SqliteUnitTests
             From = fromDate,
             To = toDate,
             CorrelationId = "corr-xyz",
-            AfterRecordId = cursorId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId),
             PageSize = 25
         };
 
@@ -273,7 +274,7 @@ public sealed class SqliteUnitTests
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
 
         conn.ExecutedCommands.Should().HaveCount(1);
         var cmd = conn.ExecutedCommands[0];
@@ -287,7 +288,7 @@ public sealed class SqliteUnitTests
         cmd.CommandText.Should().Contain("resource_id = @ResourceId");
         cmd.CommandText.Should().Contain("outcome = @Outcome");
         cmd.CommandText.Should().Contain("correlation_id = @CorrelationId");
-        cmd.CommandText.Should().Contain("occurred_at > (SELECT occurred_at FROM audit_records WHERE id = @CursorId)");
+        cmd.CommandText.Should().Contain("occurred_at > @CursorDate");
         cmd.CommandText.Should().Contain("LIMIT 26");
 
         cmd.Parameters["TenantId"].Value.Should().Be("tenant-a");
@@ -322,7 +323,9 @@ public sealed class SqliteUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeTrue();
-        result.NextCursorId.Should().Be(r2.Id);
+        result.NextPageToken.Should().NotBeNull();
+        EricksonLopez.Auditing.AuditCursorToken.TryParse(result.NextPageToken, out _, out var parsedId).Should().BeTrue();
+        parsedId.Should().Be(r2.Id);
     }
 
     [Fact]
@@ -360,7 +363,7 @@ public sealed class SqliteUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
         result.Records[0].Changes.Should().NotBeNull();
         result.Records[0].Changes!.Count.Should().Be(1);
         result.Records[0].Changes![0].Field.Should().Be("Field1");
@@ -372,6 +375,7 @@ public sealed class SqliteUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
 
@@ -545,6 +549,7 @@ public sealed class SqliteUnitTests
     {
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         var builder = services.AddAuditing();
         builder.UseSqlite(options =>
@@ -628,7 +633,7 @@ public sealed class SqliteUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -639,7 +644,7 @@ public sealed class SqliteUnitTests
 
         var store = CreateStore(conn);
         var cursorId = Guid.NewGuid();
-        await store.QueryAsync(new AuditQuery { TenantId = "tenant-cursor", AfterRecordId = cursorId, PageSize = 10 });
+        await store.QueryAsync(new AuditQuery { TenantId = "tenant-cursor", ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, cursorId), PageSize = 10 });
 
         conn.ExecutedCommands.Should().HaveCount(1);
         conn.ExecutedCommands[0].Parameters["CursorId"].Value.Should().Be(cursorId.ToString());
@@ -819,4 +824,194 @@ public sealed class SqliteUnitTests
         var verOpenRes = await verifierOpen.VerifyChainAsync("tenant-conn", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
         verOpenRes.IsValid.Should().BeTrue();
     }
+
+    private sealed class NonDbConnectionWrapper : IDbConnection
+    {
+        private readonly FakeDbConnection _inner;
+        public NonDbConnectionWrapper(FakeDbConnection inner) => _inner = inner;
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public string ConnectionString { get => _inner.ConnectionString ?? string.Empty; set => _inner.ConnectionString = value ?? string.Empty; }
+        public int ConnectionTimeout => _inner.ConnectionTimeout;
+        public string Database => _inner.Database;
+        public ConnectionState State => _inner.State;
+        public IDbTransaction BeginTransaction() => _inner.BeginTransaction();
+        public IDbTransaction BeginTransaction(IsolationLevel il) => _inner.BeginTransaction(il);
+        public void ChangeDatabase(string databaseName) => _inner.ChangeDatabase(databaseName);
+        public void Close() => _inner.Close();
+        public IDbCommand CreateCommand() => _inner.CreateCommand();
+        public void Open() => _inner.Open();
+        public void Dispose() => _inner.Dispose();
+    }
+
+    private sealed class TestSensitivityPipeline : IAuditSensitivityPipeline
+    {
+        public int SanitizeCount { get; private set; }
+
+        public ValueTask<AuditRecord> SanitizeAsync(AuditRecord record, CancellationToken cancellationToken = default)
+        {
+            SanitizeCount++;
+            return ValueTask.FromResult(record);
+        }
+
+        public ValueTask<IReadOnlyList<AuditChange>?> ApplyAsync(IReadOnlyList<AuditChange>? changes, string tenantId, CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(changes);
+        }
+    }
+
+    [Fact]
+    public void SqliteAuditStoreOptions_Table_Validation()
+    {
+        var options = new SqliteAuditStoreOptions();
+        options.Table.Should().Be("audit_records");
+
+        options.Table = "custom_table";
+        options.Table.Should().Be("custom_table");
+
+        Action actNull = () => options.Table = null!;
+        actNull.Should().Throw<ArgumentNullException>()
+            .WithParameterName("value");
+
+        Action actEmpty = () => options.Table = "";
+        actEmpty.Should().Throw<ArgumentException>()
+            .WithMessage("*The value cannot be an empty string*")
+            .WithParameterName("value");
+
+        Action actWhitespace = () => options.Table = "   ";
+        actWhitespace.Should().Throw<ArgumentException>()
+            .WithMessage("*The value cannot be an empty string or composed entirely of whitespace*")
+            .WithParameterName("value");
+
+        Action act = () => options.Table = "invalid-table-name!";
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*is not a valid SQL identifier*")
+            .WithParameterName("value");
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_EmptyBatch_ReturnsWithoutExecuting()
+    {
+        var conn = new FakeDbConnection();
+        var store = CreateStore(conn);
+        await store.AppendBatchAsync(Array.Empty<AuditRecord>());
+        conn.ExecutedCommands.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Append_And_AppendBatch_WithSensitivityPipeline_SanitizesRecords()
+    {
+        var conn = new FakeDbConnection();
+        var pipeline = new TestSensitivityPipeline();
+        var store = new SqliteAuditStore(new SqliteAuditStoreOptions
+        {
+            ConnectionFactory = () => conn
+        }, pipeline);
+
+        var r = AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens");
+        await store.AppendAsync(r);
+        pipeline.SanitizeCount.Should().Be(1);
+
+        var records = new[]
+        {
+            AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens"),
+            AuditRecordBuilder.BuildDefault(tenantId: "tenant-sens")
+        };
+        await store.AppendBatchAsync(records);
+        pipeline.SanitizeCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_WithNonDbConnection_OpensAndBeginsTransaction()
+    {
+        var innerConn = new FakeDbConnection();
+        innerConn.Close();
+        var wrapper = new NonDbConnectionWrapper(innerConn);
+        var store = new SqliteAuditStore(new SqliteAuditStoreOptions
+        {
+            ConnectionFactory = () => wrapper
+        });
+
+        var records = new[]
+        {
+            AuditRecordBuilder.BuildDefault(tenantId: "tenant-nondb")
+        };
+        await store.AppendBatchAsync(records);
+        innerConn.ExecutedCommands.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_WithNonDbConnection_AlreadyOpen_DoesNotCallOpen()
+    {
+        var innerConn = new FakeDbConnection();
+        innerConn.Open();
+        var wrapper = new NonDbConnectionWrapper(innerConn);
+        var store = new SqliteAuditStore(new SqliteAuditStoreOptions
+        {
+            ConnectionFactory = () => wrapper
+        });
+
+        var records = new[]
+        {
+            AuditRecordBuilder.BuildDefault(tenantId: "tenant-nondb")
+        };
+        await store.AppendBatchAsync(records);
+        innerConn.ExecutedCommands.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Verifier_RecordsWithChanges_IncludingRedacted_VerifyCorrectly()
+    {
+        var hmac = CreateHmacService();
+        var conn = new FakeDbConnection();
+        var r = AuditRecordBuilder.Create()
+            .WithTenant("tenant-changes")
+            .WithAction(AuditAction.Update)
+            .WithResource("Order", "ord-1")
+            .AddChange("status", "pending", "approved", isRedacted: false)
+            .AddRedactedChange("credit_card")
+            .Build();
+
+        var hash = hmac.ComputeHash(r, null);
+        var signed = r with { IntegrityHash = hash, PreviousHash = null };
+
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(new[] { signed }, isStringId: true, isStringDate: true));
+        var verifier = new SqliteAuditIntegrityVerifier(new SqliteAuditStoreOptions { ConnectionFactory = () => conn }, hmac);
+
+        var result = await verifier.VerifyChainAsync("tenant-changes", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
+        result.IsValid.Should().BeTrue();
+        result.VerifiedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Verifier_RecordsWithNullAndEmptyChangesJson_VerifyCorrectly()
+    {
+        var hmac = CreateHmacService();
+        var conn = new FakeDbConnection();
+        var r = AuditRecordBuilder.Create()
+            .WithTenant("tenant-raw-changes")
+            .WithAction(AuditAction.Create)
+            .WithResource("Order", "ord-1")
+            .Build();
+
+        var hash = hmac.ComputeHash(r, null);
+        var signed = r with { IntegrityHash = hash, PreviousHash = null };
+
+        // Test with raw string "null"
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.CreateWithRawChanges(signed, "null", isStringId: true, isStringDate: true));
+        var verifier = new SqliteAuditIntegrityVerifier(new SqliteAuditStoreOptions { ConnectionFactory = () => conn }, hmac);
+
+        var result = await verifier.VerifyChainAsync("tenant-raw-changes", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
+        result.IsValid.Should().BeTrue();
+        result.VerifiedCount.Should().Be(1);
+
+        // Test with raw string "[]"
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.CreateWithRawChanges(signed, "[]", isStringId: true, isStringDate: true));
+        var resultEmpty = await verifier.VerifyChainAsync("tenant-raw-changes", DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow);
+        resultEmpty.IsValid.Should().BeTrue();
+        resultEmpty.VerifiedCount.Should().Be(1);
+    }
 }
+
+
+
+

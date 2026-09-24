@@ -20,7 +20,6 @@ public sealed class DapperUnitTests
 {
     private static DapperAuditStore CreateStore(FakeDbConnection connection, string? table = null)
     {
-        connection.EnforceOpenOnCreateCommand = true;
         var options = new DapperAuditStoreOptions
         {
             ConnectionFactory = () => connection
@@ -38,6 +37,32 @@ public sealed class DapperUnitTests
         var options = new DapperAuditStoreOptions();
         options.Table.Should().Be("audit_records");
         options.ConnectionFactory.Should().BeNull();
+    }
+
+    [Fact]
+    public void DapperAuditStoreOptions_InvalidTableIdentifier_ThrowsArgumentException()
+    {
+        var options = new DapperAuditStoreOptions();
+        Action act = () => options.Table = "invalid table name;";
+        act.Should().Throw<ArgumentException>()
+            .WithMessage("*Table 'invalid table name;' is not a valid SQL identifier. It must match ^[a-zA-Z_][a-zA-Z0-9_]*$*")
+            .WithParameterName("value");
+    }
+
+    [Fact]
+    public void DapperAuditStoreOptions_SettingTableWhitespace_ResetsToDefault()
+    {
+        var options = new DapperAuditStoreOptions { Table = "custom_table" };
+        options.Table.Should().Be("custom_table");
+
+        options.Table = "";
+        options.Table.Should().Be("audit_records");
+
+        options.Table = "   ";
+        options.Table.Should().Be("audit_records");
+
+        options.Table = null!;
+        options.Table.Should().Be("audit_records");
     }
 
     [Fact]
@@ -268,7 +293,17 @@ public sealed class DapperUnitTests
         var store = CreateStore(conn);
 
         Func<Task> act = async () => await store.QueryAsync(new AuditQuery { TenantId = tenantId! });
-        await act.Should().ThrowAsync<ArgumentException>();
+        await act.Should().ThrowAsync<ArgumentException>().WithParameterName("value");
+    }
+
+    [Fact]
+    public async Task QueryAsync_DefaultTenantId_ThrowsArgumentException()
+    {
+        var conn = new FakeDbConnection();
+        var store = CreateStore(conn);
+
+        Func<Task> act = async () => await store.QueryAsync(new AuditQuery { TenantId = default });
+        await act.Should().ThrowAsync<ArgumentException>().WithParameterName("TenantId");
     }
 
     [Fact]
@@ -296,6 +331,7 @@ public sealed class DapperUnitTests
         var conn = new FakeDbConnection();
         var store = CreateStore(conn);
         var cursorId = Guid.NewGuid();
+        var cursorDate = DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeMilliseconds());
         var fromDate = DateTimeOffset.UtcNow.AddDays(-7);
         var toDate = DateTimeOffset.UtcNow;
 
@@ -312,7 +348,7 @@ public sealed class DapperUnitTests
             From = fromDate,
             To = toDate,
             CorrelationId = "corr-xyz",
-            AfterRecordId = cursorId,
+            ContinuationToken = AuditCursorToken.Create(cursorDate, cursorId),
             PageSize = 25
         };
 
@@ -320,11 +356,11 @@ public sealed class DapperUnitTests
 
         result.Records.Should().BeEmpty();
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
 
         conn.ExecutedCommands.Should().HaveCount(1);
         var cmd = conn.ExecutedCommands[0];
-        cmd.CommandText.Should().Contain("tenant_id = @TenantId AND actor_id = @ActorId AND action_code = @ActionCode AND resource_type = @ResourceType AND resource_id = @ResourceId AND outcome = @Outcome AND occurred_at >= @From AND occurred_at <= @To AND correlation_id = @CorrelationId AND id > @AfterRecordId");
+        cmd.CommandText.Should().Contain("tenant_id = @TenantId AND actor_id = @ActorId AND action_code = @ActionCode AND resource_type = @ResourceType AND resource_id = @ResourceId AND outcome = @Outcome AND occurred_at >= @From AND occurred_at <= @To AND correlation_id = @CorrelationId AND (occurred_at > @CursorDate OR (occurred_at = @CursorDate AND id > @CursorId))");
         cmd.CommandText.Should().Contain("LIMIT @Limit");
 
         cmd.Parameters["TenantId"].Value.Should().Be("tenant-a");
@@ -336,7 +372,8 @@ public sealed class DapperUnitTests
         cmd.Parameters["From"].Value.Should().Be(fromDate);
         cmd.Parameters["To"].Value.Should().Be(toDate);
         cmd.Parameters["CorrelationId"].Value.Should().Be("corr-xyz");
-        cmd.Parameters["AfterRecordId"].Value.Should().Be(cursorId);
+        cmd.Parameters["CursorDate"].Value.Should().Be(cursorDate);
+        cmd.Parameters["CursorId"].Value.Should().Be(cursorId);
         cmd.Parameters["Limit"].Value.Should().Be(26); // PageSize + 1
     }
 
@@ -370,7 +407,7 @@ public sealed class DapperUnitTests
         var r2 = AuditRecordBuilder.BuildDefault(resourceId: "2");
         var r3 = AuditRecordBuilder.BuildDefault(resourceId: "3");
 
-        // 3 rows returned when PageSize is 2 -> hasMore = true, NextCursorId = r2.Id
+        // 3 rows returned when PageSize is 2 -> hasMore = true, NextPageToken = r2.Id
         conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(r1, r2, r3));
 
         var result = await store.QueryAsync(new AuditQuery
@@ -381,7 +418,7 @@ public sealed class DapperUnitTests
 
         result.Records.Should().HaveCount(2);
         result.HasMore.Should().BeTrue();
-        result.NextCursorId.Should().Be(r2.Id);
+        result.NextPageToken.Should().NotBeNull(); EricksonLopez.Auditing.AuditCursorToken.TryParse(result.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(r2.Id);
     }
 
     [Fact]
@@ -392,12 +429,12 @@ public sealed class DapperUnitTests
         var r1 = AuditRecordBuilder.BuildDefault(resourceId: "1");
         var r2 = AuditRecordBuilder.BuildDefault(resourceId: "2");
 
-        // Exactly 2 rows returned when PageSize is 2 -> hasMore = false, NextCursorId = null
+        // Exactly 2 rows returned when PageSize is 2 -> hasMore = false, NextPageToken = null
         conn1.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(r1, r2));
         var result1 = await store1.QueryAsync(new AuditQuery { TenantId = "tenant-a", PageSize = 2 });
         result1.Records.Should().HaveCount(2);
         result1.HasMore.Should().BeFalse();
-        result1.NextCursorId.Should().BeNull();
+        result1.NextPageToken.Should().BeNull();
 
         // 0 rows returned
         var conn2 = new FakeDbConnection();
@@ -406,7 +443,7 @@ public sealed class DapperUnitTests
         var result2 = await store2.QueryAsync(new AuditQuery { TenantId = "tenant-a", PageSize = 2 });
         result2.Records.Should().BeEmpty();
         result2.HasMore.Should().BeFalse();
-        result2.NextCursorId.Should().BeNull();
+        result2.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -462,7 +499,7 @@ public sealed class DapperUnitTests
 
         result.Should().NotBeNull();
         result!.Id.Should().Be(record.Id);
-        result.Context.TenantId.Should().Be("tenant-a");
+        result.Context.TenantId.Value.Should().Be("tenant-a");
         result.Context.Source.Should().Be("PaymentGateway");
         result.Context.CorrelationId.Should().Be("corr-1");
         result.Context.CausationId.Should().Be("cause-1");
@@ -664,4 +701,30 @@ public sealed class DapperUnitTests
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("DapperAuditStoreOptions.ConnectionFactory must be configured. Call UseDapper(options => options.ConnectionFactory = () => new DbConnection(...)).");
     }
+
+    [Fact]
+    public async Task Store_EnforcesOpenConnection_OnAppendGetByIdAndQuery()
+    {
+        var conn = new FakeDbConnection { EnforceOpenOnCreateCommand = true };
+        var store = new DapperAuditStore(new DapperAuditStoreOptions { ConnectionFactory = () => conn });
+        var record = AuditRecordBuilder.BuildDefault("tenant-open");
+
+        // 1. AppendAsync
+        await store.AppendAsync(record);
+        conn.ExecutedCommands.Should().Contain(c => c.CommandText.Contains("INSERT INTO"));
+
+        // 2. GetByIdAsync
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(record));
+        var fetched = await store.GetByIdAsync(record.Id, record.Context.TenantId.Value);
+        fetched.Should().NotBeNull();
+
+        // 3. QueryAsync
+        conn.ReaderQueues.Enqueue(_ => FakeDbDataReaderFactory.Create(Array.Empty<AuditRecord>()));
+        var queryResult = await store.QueryAsync(new AuditQuery { TenantId = "tenant-open" });
+        queryResult.Records.Should().BeEmpty();
+    }
 }
+
+
+
+

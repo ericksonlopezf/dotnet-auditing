@@ -1,9 +1,10 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <Description>Microsoft SQL Server and Azure SQL adapter for EricksonLopez.Auditing. Includes append-only store, SESSION_CONTEXT + Security Policy RLS tenant isolation, keyset pagination, and HMAC chain integrity. AOT-compatible.</Description>
-    <PackageTags>$(CommonPackageTags);sqlserver;mssql;azure-sql;dapper;session-context;rls;multi-tenant;native-aot</PackageTags>
+    <PackageTags>$(CommonPackageTags);sqlserver;mssql;azure-sql;dapper;session-context;rls;multi-tenant</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

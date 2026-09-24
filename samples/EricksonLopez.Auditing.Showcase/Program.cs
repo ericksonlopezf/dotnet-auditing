@@ -36,6 +36,7 @@ public static class Program
             Console.WriteLine(" [8]  Level 8  — Customization (Custom Providers for Actor, Key & Store)");
             Console.WriteLine(" [9]  Level 9  — Persistence Providers & OpenTelemetry)");
             Console.WriteLine(" [10] Level 10 — Enterprise Architecture (HMAC Tamper Detection & GDPR)");
+            Console.WriteLine(" [11] Level 11 — Comprehensive Public API Coverage Verification (100% Gate)");
             Console.WriteLine(" [A]  Run ALL levels sequentially");
             Console.WriteLine(" [Q]  Quit");
             Console.WriteLine(" ─────────────────────────────────────────────────────────────────────────────");
@@ -85,6 +86,9 @@ public static class Program
                     case "10":
                         await Level10_EnterpriseArchitecture.RunAsync();
                         break;
+                    case "11":
+                        await Level11_ComprehensiveApiCoverage.RunAsync();
+                        break;
                     case "A":
                         await RunAllLevelsAsync();
                         break;
@@ -112,7 +116,7 @@ public static class Program
 
         PrintHeader();
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine(" >> RUNNING FULL SHOWCASE SUITE (LEVELS 0 THROUGH 10) <<\n");
+        Console.WriteLine(" >> RUNNING FULL SHOWCASE SUITE (LEVELS 0 THROUGH 11) <<\n");
         Console.ResetColor();
 
         Level00_Conceptual.Run();
@@ -126,6 +130,7 @@ public static class Program
         await Level08_Customization.RunAsync();
         await Level09_Providers.RunAsync();
         await Level10_EnterpriseArchitecture.RunAsync();
+        await Level11_ComprehensiveApiCoverage.RunAsync();
 
         totalSw.Stop();
         Console.ForegroundColor = ConsoleColor.Green;

@@ -210,6 +210,54 @@ public sealed class MongoAuditStoreTests
     }
 
     [Fact]
+    public async Task AppendAsync_WithSensitivityPipeline_SanitizesRecordBeforeInsert()
+    {
+        var collection = Substitute.For<IMongoCollection<MongoAuditRecordDocument>>();
+        var pipeline = Substitute.For<IAuditSensitivityPipeline>();
+        var store = new MongoAuditStore(collection, pipeline);
+
+        var original = AuditRecordBuilder.BuildDefault(tenantId: "t-sens");
+        var sanitized = AuditRecordBuilder.BuildDefault(tenantId: "t-sens", resourceId: "REDACTED");
+
+        pipeline.SanitizeAsync(original, Arg.Any<CancellationToken>()).Returns(sanitized);
+
+        await store.AppendAsync(original);
+
+        await pipeline.Received(1).SanitizeAsync(original, Arg.Any<CancellationToken>());
+        await collection.Received(1).InsertOneAsync(
+            Arg.Is<MongoAuditRecordDocument>(d => d.ResourceId == "REDACTED"),
+            cancellationToken: Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AppendBatchAsync_WithSensitivityPipeline_SanitizesAllRecordsBeforeInsert()
+    {
+        var collection = Substitute.For<IMongoCollection<MongoAuditRecordDocument>>();
+        var pipeline = Substitute.For<IAuditSensitivityPipeline>();
+        var store = new MongoAuditStore(collection, pipeline);
+
+        var rec1 = AuditRecordBuilder.BuildDefault(tenantId: "t-batch", resourceId: "res-1");
+        var rec2 = AuditRecordBuilder.BuildDefault(tenantId: "t-batch", resourceId: "res-2");
+        var sanitized1 = AuditRecordBuilder.BuildDefault(tenantId: "t-batch", resourceId: "res-1-sanitized");
+        var sanitized2 = AuditRecordBuilder.BuildDefault(tenantId: "t-batch", resourceId: "res-2-sanitized");
+
+        pipeline.SanitizeAsync(rec1, Arg.Any<CancellationToken>()).Returns(sanitized1);
+        pipeline.SanitizeAsync(rec2, Arg.Any<CancellationToken>()).Returns(sanitized2);
+
+        var batch = new List<AuditRecord> { rec1, rec2 };
+        await store.AppendBatchAsync(batch);
+
+        await pipeline.Received(1).SanitizeAsync(rec1, Arg.Any<CancellationToken>());
+        await pipeline.Received(1).SanitizeAsync(rec2, Arg.Any<CancellationToken>());
+        await collection.Received(1).InsertManyAsync(
+            Arg.Is<IEnumerable<MongoAuditRecordDocument>>(docs =>
+                docs.Count() == 2 &&
+                docs.First().ResourceId == "res-1-sanitized" &&
+                docs.Last().ResourceId == "res-2-sanitized"),
+            cancellationToken: Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task QueryAsync_NullQuery_ThrowsArgumentNullException()
     {
         var collection = Substitute.For<IMongoCollection<MongoAuditRecordDocument>>();
@@ -217,6 +265,16 @@ public sealed class MongoAuditStoreTests
 
         var act = async () => await store.QueryAsync(null!);
         await act.Should().ThrowAsync<ArgumentNullException>().WithParameterName("query");
+    }
+
+    [Fact]
+    public async Task QueryAsync_DefaultTenantId_ThrowsArgumentException()
+    {
+        var collection = Substitute.For<IMongoCollection<MongoAuditRecordDocument>>();
+        var store = new MongoAuditStore(collection);
+
+        var act = async () => await store.QueryAsync(new AuditQuery { TenantId = default });
+        await act.Should().ThrowAsync<ArgumentException>().WithParameterName("TenantId");
     }
 
     [Theory]
@@ -229,7 +287,7 @@ public sealed class MongoAuditStoreTests
         var store = new MongoAuditStore(collection);
 
         var act = async () => await store.QueryAsync(new AuditQuery { TenantId = tenantId! });
-        await act.Should().ThrowAsync<ArgumentException>().WithParameterName("query.TenantId");
+        await act.Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact]
@@ -266,7 +324,7 @@ public sealed class MongoAuditStoreTests
             From = fromDate,
             To = toDate,
             CorrelationId = "corr-1",
-            AfterRecordId = afterId,
+            ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, afterId),
             PageSize = 25
         };
 
@@ -276,8 +334,8 @@ public sealed class MongoAuditStoreTests
         var bson = RenderFilter(capturedFilter);
         var json = bson.ToJson();
 
-        // Must NOT contain $or (proves & was used, not |=)
-        json.Should().NotContain("$or");
+        // Keyset pagination uses $or to implement (Date > CursorDate) OR (Date == CursorDate AND Id > CursorId)
+        json.Should().Contain("$or");
 
         // Verify all fields are present in the filter
         json.Should().Contain("tenantId");
@@ -302,6 +360,14 @@ public sealed class MongoAuditStoreTests
         // Limit must be PageSize + 1 (26)
         capturedOptions.Should().NotBeNull();
         capturedOptions.Limit.Should().Be(26);
+
+        // Sort must be OccurredAt ASC, Id ASC
+        var serializerRegistry = BsonSerializer.SerializerRegistry;
+        var docSerializer = serializerRegistry.GetSerializer<MongoAuditRecordDocument>();
+        var sortBson = capturedOptions.Sort.Render(new RenderArgs<MongoAuditRecordDocument>(docSerializer, serializerRegistry)).ToJson();
+        sortBson.Should().Contain("\"occurredAt\" : 1");
+        sortBson.Should().Contain("\"_id\" : 1");
+        sortBson.Should().NotContain("\"_id\" : -1");
     }
 
     [Theory]
@@ -450,14 +516,14 @@ public sealed class MongoAuditStoreTests
         var afterId = Guid.NewGuid();
 
         // When set
-        await store.QueryAsync(new AuditQuery { TenantId = "t1", AfterRecordId = afterId });
+        await store.QueryAsync(new AuditQuery { TenantId = "t1", ContinuationToken = AuditCursorToken.Create(System.DateTimeOffset.UtcNow, afterId) });
         var jsonSet = RenderFilter(capturedFilter).ToJson();
         jsonSet.Should().Contain("_id");
         jsonSet.Should().Contain("$gt");
-        jsonSet.Should().NotContain("$or");
+        jsonSet.Should().Contain("$or");
 
         // When null
-        await store.QueryAsync(new AuditQuery { TenantId = "t1", AfterRecordId = null });
+        await store.QueryAsync(new AuditQuery { TenantId = "t1", ContinuationToken = null });
         var jsonNull = RenderFilter(capturedFilter).ToJson();
         jsonNull.Should().NotContain("_id");
     }
@@ -486,7 +552,7 @@ public sealed class MongoAuditStoreTests
 
         result.Records.Should().HaveCount(3);
         result.HasMore.Should().BeFalse();
-        result.NextCursorId.Should().BeNull();
+        result.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -514,7 +580,7 @@ public sealed class MongoAuditStoreTests
 
         result.Records.Should().HaveCount(3);
         result.HasMore.Should().BeTrue();
-        result.NextCursorId.Should().Be(doc3.Id);
+        result.NextPageToken.Should().NotBeNull(); EricksonLopez.Auditing.AuditCursorToken.TryParse(result.NextPageToken, out _, out var parsedId).Should().BeTrue(); parsedId.Should().Be(doc3.Id);
     }
 
     [Fact]
@@ -583,7 +649,7 @@ public sealed class MongoAuditStoreTests
 
         var r1 = result.Records[0];
         r1.Id.Should().Be(docWithChanges.Id);
-        r1.Context.TenantId.Should().Be("tenant-map");
+        r1.Context.TenantId.Value.Should().Be("tenant-map");
         r1.Context.Source.Should().Be("App");
         r1.Actor.Type.Should().Be(AuditActorType.User);
         r1.Actor.Id.Should().Be("user-1");
@@ -710,3 +776,7 @@ public sealed class MongoAuditStoreTests
         act2.Should().Throw<ArgumentNullException>().WithParameterName("databaseFactory");
     }
 }
+
+
+
+

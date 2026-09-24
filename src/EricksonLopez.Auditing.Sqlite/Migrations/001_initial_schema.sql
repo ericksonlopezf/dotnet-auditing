@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- EricksonLopez.Auditing — SQLite Schema Migration
--- Version: 1.0.0
+-- Version: 2.0.0
 -- Description:
 --   Creates the audit_records table and indexes for fast tenant/time queries.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS audit_records (
     request_id      TEXT    NULL,
     ip_address      TEXT    NULL,
     user_agent      TEXT    NULL,
+    idempotency_key TEXT    NULL,
 
     changes         TEXT    NULL,
 
@@ -51,3 +52,7 @@ CREATE INDEX IF NOT EXISTS ix_audit_records_resource
 CREATE INDEX IF NOT EXISTS ix_audit_records_correlation
     ON audit_records (correlation_id)
     WHERE correlation_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ix_audit_chain
+    ON audit_records (tenant_id, previous_hash)
+    WHERE previous_hash IS NOT NULL;

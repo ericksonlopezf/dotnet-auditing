@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Testing Roadmap & Functional Unit Coverage — EricksonLopez.Auditing
 
 ## 1. Overview & Strategy
@@ -30,8 +31,13 @@ The testing strategy for `EricksonLopez.Auditing` is built on three pillars:
 | **U15** | `MongoDb` | BSON document mapping, index creation, capped collection support | `EricksonLopez.Auditing.MongoDb.Tests` |
 | **U16** | `OpenTelemetry` | Activity creation, span attributes, audit event tracing metrics | `EricksonLopez.Auditing.OpenTelemetry.Tests` |
 | **U17** | `Testing` | In-memory test store, assertion helpers, test harness spies | `EricksonLopez.Auditing.Testing.Tests` |
+| **U18** | `Analyzers` | Roslyn analyzer diagnostic rules, immutability checks, code fixes | `EricksonLopez.Auditing.Analyzers.Tests` |
+| **U19** | `AzureKeyVault` | Key Vault secret retrieval, HSM key rotation, mocked KMS responses | `EricksonLopez.Auditing.Tests` |
+| **U20** | `Outbox` | Transactional outbox persistence, buffer decorators, queue drainage | `EricksonLopez.Auditing.Tests` |
 | **I01** | `Integration` | Multi-engine real container persistence & roundtrip verification | `EricksonLopez.Auditing.IntegrationTests` |
 | **S01** | `NativeAOT` | Zero reflection Native AOT compilation & trimming smoke test | `EricksonLopez.Auditing.AotSmokeTest` |
+| **B01** | `Benchmarks` | 0 B heap allocation hot paths, latency regression gate (≤5%) | `EricksonLopez.Auditing.Benchmarks` |
+| **M01** | `Compliance` | Zero-tolerance governance, MIT headers, NoWarn bypass audit | `scripts/verify-compliance.ps1` |
 
 ---
 

@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- EricksonLopez.Auditing — Oracle Database 19c / 21c / 23ai Schema Migration
--- Version: 1.0.0
+-- Version: 2.0.0
 -- Description:
 --   Creates the AUDIT_RECORDS table, composite indexes, and guidelines
 --   for Virtual Private Database (VPD) tenant isolation.
@@ -31,6 +31,7 @@ CREATE TABLE "AUDIT_RECORDS" (
     "REQUEST_ID"      VARCHAR2(128)           NULL,
     "IP_ADDRESS"      VARCHAR2(45)            NULL,
     "USER_AGENT"      VARCHAR2(512)           NULL,
+    "IDEMPOTENCY_KEY" VARCHAR2(128)           NULL,
 
     "CHANGES"         CLOB                    NULL,
 
@@ -53,3 +54,5 @@ CREATE INDEX "IX_AUD_REC_RESOURCE"
 
 CREATE INDEX "IX_AUD_REC_CORRELATION"
     ON "AUDIT_RECORDS" ("CORRELATION_ID");
+
+ALTER TABLE "AUDIT_RECORDS" ADD CONSTRAINT uk_audit_chain UNIQUE ("TENANT_ID", "PREVIOUS_HASH");

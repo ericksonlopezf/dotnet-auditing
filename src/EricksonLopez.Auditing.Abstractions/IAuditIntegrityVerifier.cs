@@ -13,7 +13,7 @@ public interface IAuditIntegrityVerifier
     /// <param name="from">The inclusive start timestamp of the verification window.</param>
     /// <param name="until">The inclusive end timestamp of the verification window.</param>
     /// <param name="cancellationToken">A token that can be used to cancel the asynchronous operation.</param>
-    /// <returns>A value task representing the asynchronous operation. The task result contains the verification outcome details.</returns>
+    /// <returns>A task representing the asynchronous operation. The task result contains the verification outcome details.</returns>
     ValueTask<AuditIntegrityVerificationResult> VerifyChainAsync(
         string tenantId,
         DateTimeOffset from,

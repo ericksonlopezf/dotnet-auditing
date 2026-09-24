@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "EricksonLopez.Auditing.MySql.csproj",
     "test-projects": [
-      "EricksonLopez.Auditing.MySql.Tests.csproj"
+      "tests/EricksonLopez.Auditing.MySql.Tests/EricksonLopez.Auditing.MySql.Tests.csproj"
     ],
     "mutate": [
       "**/*.cs",
@@ -21,6 +21,11 @@
       "json",
       "cleartext",
       "progress"
+    ],
+    "concurrency": 2,
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose"
     ]
   }
 }
