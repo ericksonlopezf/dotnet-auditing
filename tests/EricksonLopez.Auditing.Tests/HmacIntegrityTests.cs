@@ -11,12 +11,12 @@ namespace EricksonLopez.Auditing.Tests;
 public sealed class HmacIntegrityTests
 {
     private static HmacAuditIntegrityService BuildService() =>
-        new(new TestAuditIntegrityProvider(new byte[32])); // 256-bit zero key for tests
+        new(new TestAuditIntegrityProvider(new byte[32]), new HmacSha256AuditHashAlgorithm()); // 256-bit zero key for tests
 
     [Fact]
     public void Constructor_NullKeyProvider_Throws()
     {
-        Action act = () => _ = new HmacAuditIntegrityService(null!);
+        Action act = () => _ = new HmacAuditIntegrityService(null!, new HmacSha256AuditHashAlgorithm());
         act.Should().Throw<ArgumentNullException>();
     }
 
@@ -122,11 +122,11 @@ public sealed class HmacIntegrityTests
         {
             Id = r1.Id,
             OccurredAt = r1.OccurredAt,
-            Actor = new AuditActor(AuditActorType.User, "", "Alice"),
-            Action = new AuditAction("Creat"),
-            Resource = new AuditResource("eOrder", "1"),
+            Actor = new AuditActor(AuditActorType.User, "bA", "lice"),
+            Action = new AuditAction("Create"),
+            Resource = new AuditResource("Order", "1"),
             Outcome = AuditOutcome.Success,
-            Context = new AuditContext("tenant-ab", "src", null)
+            Context = new AuditContext("tenant-a", "src", null)
         };
 
         // Without | delimiters, both might concatenate to the same string.
@@ -151,16 +151,15 @@ public sealed class HmacIntegrityTests
             Context = new AuditContext("tenant-a", "src", null)
         };
         var hashWithPrev = svc.ComputeHash(record, "prev");
-        hashWithPrev.Should().Be("5c9b353fb2e7a78949d1f05aad998323f17cf4aaf163ad5c7595580f3a94c9f8");
-
         var hashFirst = svc.ComputeHash(record, null);
-        hashFirst.Should().Be("f55ec3b9d8fb3cd6b530ba3e3dfe91d5e2717442deaadd1bebb9f8719f6b4efa");
+        hashWithPrev.Should().Be("e87239423cec7b4f671aeb1c745d587964b870416cb011b94bd18ab2e1ce3ac3");
+        hashFirst.Should().Be("859c76fc1ef56e9baafe9c3763fa6eddaee1d91e3a0e34e42c7aaa8dcd86fad7");
     }
 
     [Property(MaxTest = 100)]
     public bool HmacVerification_SucceedsForUntamperedRecords_AndFailsOnTamperedPayload(NonNull<string> tenant)
     {
-        if (string.IsNullOrEmpty(tenant.Get)) return true;
+        if (string.IsNullOrWhiteSpace(tenant.Get)) return true;
 
         var svc = BuildService();
         var record = AuditRecordBuilder.Create().WithTenant(tenant.Get).Build();
@@ -175,3 +174,7 @@ public sealed class HmacIntegrityTests
         return isVerifiable && isTamperDetected;
     }
 }
+
+
+
+

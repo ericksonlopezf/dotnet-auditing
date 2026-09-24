@@ -31,8 +31,8 @@ public class SensitivityPipelineBenchmarks
     }
 
     [Benchmark]
-    public IReadOnlyList<AuditChange>? ApplySensitivityPipeline()
+    public System.Threading.Tasks.ValueTask<IReadOnlyList<AuditChange>?> ApplySensitivityPipelineAsync()
     {
-        return _pipeline.Apply(_changes);
+        return _pipeline.ApplyAsync(_changes, "test-tenant-1");
     }
 }

@@ -29,6 +29,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\EricksonLopez.Auditing\EricksonLopez.Auditing.csproj" />
     <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Testing\EricksonLopez.Auditing.Testing.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Outbox\EricksonLopez.Auditing.Outbox.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.AzureKeyVault\EricksonLopez.Auditing.AzureKeyVault.csproj" />
   </ItemGroup>
 
 </Project>

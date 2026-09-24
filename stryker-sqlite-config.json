@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "EricksonLopez.Auditing.Sqlite.csproj",
     "test-projects": [
-      "EricksonLopez.Auditing.Sqlite.Tests.csproj"
+      "tests/EricksonLopez.Auditing.Sqlite.Tests/EricksonLopez.Auditing.Sqlite.Tests.csproj"
     ],
     "mutate": [
       "**/*.cs",
@@ -21,6 +21,11 @@
       "json",
       "cleartext",
       "progress"
+    ],
+    "concurrency": 2,
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose"
     ]
   }
 }

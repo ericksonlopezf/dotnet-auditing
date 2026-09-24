@@ -279,6 +279,7 @@ public static class Level09_Providers
                 request_id TEXT,
                 ip_address TEXT,
                 user_agent TEXT,
+                idempotency_key TEXT,
                 changes TEXT,
                 integrity_hash TEXT,
                 previous_hash TEXT

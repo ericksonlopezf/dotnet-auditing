@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "EricksonLopez.Auditing.MongoDb.csproj",
     "test-projects": [
-      "EricksonLopez.Auditing.MongoDb.Tests.csproj"
+      "tests/EricksonLopez.Auditing.MongoDb.Tests/EricksonLopez.Auditing.MongoDb.Tests.csproj"
     ],
     "mutate": [
       "**/*.cs",
@@ -21,6 +21,11 @@
       "json",
       "cleartext",
       "progress"
+    ],
+    "concurrency": 2,
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose"
     ]
   }
 }

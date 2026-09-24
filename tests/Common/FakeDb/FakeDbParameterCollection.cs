@@ -16,11 +16,11 @@ internal sealed class FakeDbParameterCollection : DbParameterCollection
     public override void AddRange(Array values) { foreach (var v in values) Add(v); }
     public override void Clear() => _parameters.Clear();
     public override bool Contains(object value) => _parameters.Contains((DbParameter)value);
-    public override bool Contains(string value) => _parameters.Exists(p => p.ParameterName == value);
+    public override bool Contains(string value) => _parameters.Exists(p => string.Equals(p.ParameterName?.TrimStart('@', ':'), value?.TrimStart('@', ':'), StringComparison.OrdinalIgnoreCase));
     public override void CopyTo(Array array, int index) => ((System.Collections.ICollection)_parameters).CopyTo(array, index);
     public override System.Collections.IEnumerator GetEnumerator() => _parameters.GetEnumerator();
     public override int IndexOf(object value) => _parameters.IndexOf((DbParameter)value);
-    public override int IndexOf(string parameterName) => _parameters.FindIndex(p => p.ParameterName == parameterName);
+    public override int IndexOf(string parameterName) => _parameters.FindIndex(p => string.Equals(p.ParameterName?.TrimStart('@', ':'), parameterName?.TrimStart('@', ':'), StringComparison.OrdinalIgnoreCase));
     public override void Insert(int index, object value) => _parameters.Insert(index, (DbParameter)value);
     public override void Remove(object value) => _parameters.Remove((DbParameter)value);
     public override void RemoveAt(int index) => _parameters.RemoveAt(index);
@@ -34,3 +34,6 @@ internal sealed class FakeDbParameterCollection : DbParameterCollection
     protected override void SetParameter(int index, DbParameter value) => _parameters[index] = value;
     protected override void SetParameter(string parameterName, DbParameter value) => _parameters[IndexOf(parameterName)] = value;
 }
+
+
+

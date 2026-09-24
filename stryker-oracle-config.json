@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "EricksonLopez.Auditing.Oracle.csproj",
     "test-projects": [
-      "EricksonLopez.Auditing.Oracle.Tests.csproj"
+      "tests/EricksonLopez.Auditing.Oracle.Tests/EricksonLopez.Auditing.Oracle.Tests.csproj"
     ],
     "mutate": [
       "**/*.cs",
@@ -21,6 +21,11 @@
       "json",
       "cleartext",
       "progress"
+    ],
+    "concurrency": 2,
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose"
     ]
   }
 }

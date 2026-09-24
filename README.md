@@ -1,11 +1,11 @@
 # EricksonLopez.Auditing
 
-High-performance, Native AOT-first, cryptographically verifiable, multi-tenant forensic audit trail and change-evidence ecosystem for modern .NET.
+High-performance, Native AOT-ready, cryptographically verifiable, multi-tenant forensic audit trail and change-tracking ecosystem for modern .NET.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/ericksonlopezf/dotnet-auditing/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/ericksonlopezf/dotnet-auditing/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/ericksonlopezf/dotnet-auditing?style=for-the-badge&logo=codecov&logoColor=white)](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/ci-cd-and-quality.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/ericksonlopezf/dotnet-auditing/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/ericksonlopezf/dotnet-auditing/actions)
+[![Coverage](https://img.shields.io/codecov/c/github/ericksonlopezf/dotnet-auditing?style=for-the-badge&logo=codecov&logoColor=white)](https://codecov.io/gh/ericksonlopezf/dotnet-auditing)
 [![Quality Gate](https://img.shields.io/sonar/quality_gate/ericksonlopezf_dotnet-auditing?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&logo=sonarcloud&logoColor=white)](https://sonarcloud.io/summary/new_code?id=ericksonlopezf_dotnet-auditing)
-[![Mutation Score](https://img.shields.io/badge/Mutation_Score-%E2%89%A5_99%25-brightgreen?style=for-the-badge&logo=stryker&logoColor=white)](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/ci-cd-and-quality.md)
+[![Mutation Score](https://img.shields.io/badge/Mutation_Score-%E2%89%A599%25-brightgreen?style=for-the-badge&logo=stryker&logoColor=white)](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/mutation-score.md)
 [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Auditing?style=for-the-badge&logo=nuget&logoColor=white&color=512BD4)](https://www.nuget.org/packages/EricksonLopez.Auditing)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/EricksonLopez.Auditing?style=for-the-badge&logo=nuget&logoColor=white&color=004880)](https://www.nuget.org/packages/EricksonLopez.Auditing)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/LICENSE)
@@ -24,7 +24,7 @@ High-performance, Native AOT-first, cryptographically verifiable, multi-tenant f
 - [Key Features](#-key-features)
 - [Ecosystem](#-ecosystem)
 - [Documentation](#-documentation)
-  - [Step-by-Step Interactive Showcase (Levels 00 to 10)](#-step-by-step-interactive-showcase-levels-00-to-10)
+  - [Step-by-Step Interactive Showcase (Levels 00 to 11)](#-step-by-step-interactive-showcase-levels-00-to-11)
   - [Technical Reference & Architecture Guides](#-technical-reference--architecture-guides)
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
@@ -71,7 +71,7 @@ Enterprise applications subject to regulatory compliance mandates (**SOC2**, **P
 | Mutable database rows vulnerable to DBA tampering | Cryptographic HMAC-SHA256 tamper-evident chain |
 | Plain-text credentials and PII logged by mistake | Automated global denylist & sensitive field redaction |
 | Random UUIDv4 causing severe B-Tree page splits | RFC 9562 UUIDv7 monotonic time-ordered index writes |
-| Slow $O(N)$ `OFFSET 50000` table scan pagination | Fast $O(1)$ Keyset Cursor Pagination (`AfterRecordId`) |
+| Slow $O(N)$ `OFFSET 50000` table scan pagination | Fast $O(1)$ Keyset Cursor Pagination (`AuditQuery.ContinuationToken`) |
 | Application-level filtering prone to tenant leakage | Database engine-level isolation (RLS / Session Context / VPD) |
 | Runtime reflection overhead | Zero reflection, compile-time source-generated JSON |
 ```
@@ -84,8 +84,8 @@ Enterprise applications subject to regulatory compliance mandates (**SOC2**, **P
 * 🔒 **Cryptographic HMAC-SHA256 Integrity Chain**: Verifiable predecessor hash chaining via `HmacAuditIntegrityService` and `IAuditIntegrityVerifier`.
 * ⏱️ **Monotonic RFC 9562 UUIDv7 Identifiers**: Built-in `AuditId.NewId()` ensures sequential index insertion and zero B-Tree page splits.
 * 🏢 **Native Database-Level Multi-Tenancy**: Deep platform integrations for PostgreSQL (Row-Level Security), SQL Server (`SESSION_CONTEXT`), Oracle (VPD), MySQL (session variables), and MongoDB (BSON partitioning).
-* ⚡ **Native AOT & Trimming-Ready**: 100% reflection-free architecture powered by C# `System.Text.Json` source generator (`AuditJsonContext`).
-* 🔍 **Keyset Cursor Pagination ($O(1)$)**: Zero table-scan pagination via `AuditQuery.AfterRecordId` for enterprise audit logs of arbitrary depth.
+* ⚡ **Native AOT & Trimming-Ready**: Reflection-free core engine powered by C# `System.Text.Json` source generator (`AuditJsonContext`). Core and Abstractions packages are fully AOT-compatible; database adapter packages are limited by Dapper's use of `Reflection.Emit` (tracked: issue #AOT).
+* 🔍 **Keyset Cursor Pagination ($O(1)$)**: Zero table-scan pagination via `AuditQuery.ContinuationToken` for enterprise audit logs of arbitrary depth.
 * 🧹 **Automated Sensitive Data Protection**: Built-in `AuditSensitivityPipeline` with global denylists, explicit redaction markers, and one-way SHA-256 cryptographic hashing.
 * 📊 **OpenTelemetry Distributed Tracing & Metrics**: W3C TraceContext enrichment, semantic activities (`audit.actor.id`, `audit.action.code`), and BCL meter counters.
 * 🧪 **Comprehensive Testing Infrastructure**: Dedicated `EricksonLopez.Auditing.Testing` package featuring `InMemoryAuditStore`, fluent `AuditRecordBuilder`, and mock cryptographic key providers.
@@ -94,7 +94,7 @@ Enterprise applications subject to regulatory compliance mandates (**SOC2**, **P
 
 ## 📦 Ecosystem
 
-The framework is organized into 12 decoupled, modular NuGet packages adhering to strict single-responsibility principles:
+The framework is organized into 15 decoupled, modular NuGet packages adhering to strict single-responsibility principles:
 
 | Package | Version | Description |
 |---|---|---|
@@ -110,6 +110,9 @@ The framework is organized into 12 decoupled, modular NuGet packages adhering to
 | [`EricksonLopez.Auditing.EntityFrameworkCore`](https://www.nuget.org/packages/EricksonLopez.Auditing.EntityFrameworkCore) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Auditing.EntityFrameworkCore?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Auditing.EntityFrameworkCore) | Entity Framework Core integration featuring `AuditDbContext` and entity mappings |
 | [`EricksonLopez.Auditing.OpenTelemetry`](https://www.nuget.org/packages/EricksonLopez.Auditing.OpenTelemetry) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Auditing.OpenTelemetry?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Auditing.OpenTelemetry) | OpenTelemetry semantic activities, W3C TraceContext enrichment, and BCL meter metrics |
 | [`EricksonLopez.Auditing.Testing`](https://www.nuget.org/packages/EricksonLopez.Auditing.Testing) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Auditing.Testing?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Auditing.Testing) | Test doubles: thread-safe `InMemoryAuditStore`, fluent `AuditRecordBuilder`, and mock providers |
+| [`EricksonLopez.Auditing.Analyzers`](https://www.nuget.org/packages/EricksonLopez.Auditing.Analyzers) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Auditing.Analyzers?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Auditing.Analyzers) | Roslyn diagnostic analyzers and code fixes for audit integrity, immutability, and compliance |
+| [`EricksonLopez.Auditing.AzureKeyVault`](https://www.nuget.org/packages/EricksonLopez.Auditing.AzureKeyVault) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Auditing.AzureKeyVault?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Auditing.AzureKeyVault) | Azure Key Vault cryptographic integrity provider for HMAC audit key rotation |
+| [`EricksonLopez.Auditing.Outbox`](https://www.nuget.org/packages/EricksonLopez.Auditing.Outbox) | [![NuGet](https://img.shields.io/nuget/v/EricksonLopez.Auditing.Outbox?style=flat-square)](https://www.nuget.org/packages/EricksonLopez.Auditing.Outbox) | Transactional outbox decorator for asynchronous audit record persistence and high throughput |
 
 ---
 
@@ -117,7 +120,7 @@ The framework is organized into 12 decoupled, modular NuGet packages adhering to
 
 > 🌐 **Official Documentation Hub:** [https://github.com/ericksonlopezf/dotnet-auditing/tree/main/docs](https://github.com/ericksonlopezf/dotnet-auditing/tree/main/docs)
 
-### 🎓 Step-by-Step Interactive Showcase (Levels 00 to 10)
+### 🎓 Step-by-Step Interactive Showcase (Levels 00 to 11)
 
 The repository includes a complete, executable demonstration suite located in [`samples/EricksonLopez.Auditing.Showcase`](https://github.com/ericksonlopezf/dotnet-auditing/tree/main/samples/EricksonLopez.Auditing.Showcase):
 
@@ -128,12 +131,13 @@ The repository includes a complete, executable demonstration suite located in [`
 | [**Level 02**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level02_Configuration.cs) | **Full Configuration** | `AuditConfiguration`, `AuditFailureBehavior`, `AuditSensitivityPipeline`, `GlobalFieldDenylist` |
 | [**Level 03**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level03_RealWorldUseCases.cs) | **Real-World Use Cases** | Login, permissions, updates, downloads, cancellations, restorations, and custom actions |
 | [**Level 04**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level04_AdvancedIntegration.cs) | **Ambient Context & Scopes** | `AuditScope.Begin()`, `AuditScope.Current`, `WithMetadata()`, nested ambient scope restoration |
-| [**Level 05**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level05_BatchProcessing.cs) | **Batch Processing** | `IAuditStore.AppendBatchAsync()`, multi-tenant batch validation, in-memory isolation |
-| [**Level 06**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level06_ErrorHandling.cs) | **Error Handling Boundaries** | `AuditFailureBehavior.FailClosed/FailOpen/Deferred`, structured `ErrorCode` enforcement |
-| [**Level 07**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level07_Scalability.cs) | **Scalability & Keyset Pagination** | Direct $O(1)$ cursor pagination with `AuditQuery.AfterRecordId` across large volumes |
+| [**Level 05**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level05_BatchProcessing.cs) | **Batch Processing & Outbox** | `IAuditStore.AppendBatchAsync()`, `BufferedAuditStoreDecorator`, `OutboxAuditStore` transactional outbox |
+| [**Level 06**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level06_ErrorHandling.cs) | **Error Handling & Resilience** | `AuditFailureBehavior`, `ResilientAuditStoreDecorator`, `CriticalActionCodes` exception propagation |
+| [**Level 07**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level07_Scalability.cs) | **Scalability & Keyset Pagination** | Direct $O(1)$ cursor pagination with `AuditCursorToken` and `AuditQuery` across large volumes |
 | [**Level 08**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level08_Customization.cs) | **Custom Providers & Cryptography** | `IAuditActorProvider`, `IAuditContextProvider`, `IAuditIntegrityProvider`, `HmacAuditIntegrityService` |
 | [**Level 09**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level09_Providers.cs) | **Storage Providers & Observability** | PostgreSQL, SQL Server, SQLite, MySQL, Oracle, MongoDB, EF Core, Dapper, and OpenTelemetry |
-| [**Level 10**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level10_EnterpriseArchitecture.cs) | **Enterprise Architecture & Verification** | End-to-end tampering detection, HMAC chain verification, and fluent test assertions |
+| [**Level 10**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level10_EnterpriseArchitecture.cs) | **Enterprise Architecture & KMS** | End-to-end tampering detection, Azure Key Vault, GDPR Crypto-Shredding (`IAuditCryptoKeyProvider`) |
+| [**Level 11**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/samples/EricksonLopez.Auditing.Showcase/Levels/Level11_ComprehensiveApiCoverage.cs) | **Comprehensive Public API Coverage** | Exhaustive verification of `TenantId`, `AuditFieldSensitivity`, `AuditId`, Outbox batch, and OTel decorators |
 
 ### 📖 Technical Reference & Architecture Guides
 
@@ -148,6 +152,9 @@ The repository includes a complete, executable demonstration suite located in [`
 * [**Frequently Asked Questions (FAQ)**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/faq.md) — Conceptual, operational, and architectural FAQ.
 * [**Migration Guide**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/migration-guide.md) — Version upgrade checklist and database schema migration scripts.
 * [**CI/CD & Quality Gates**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/ci-cd-and-quality.md) — CI pipeline, branch strategy, 100% coverage, and Stryker mutation testing policies.
+* [**Mutation Testing Score**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/mutation-score.md) — Exhaustive mutant kill rates and branch/mutation metrics across all 15 packages.
+* [**Anti-Patterns & Defenses**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/anti-patterns.md) — Analysis of structural anti-patterns in DIY audit systems and architectural countermeasures.
+* [**Functional Map**](https://github.com/ericksonlopezf/dotnet-auditing/blob/main/docs/functional-map.md) — Comprehensive visual capability matrix, bounded contexts, and module taxonomy.
 * [**Architectural Decision Records (ADRs)**](https://github.com/ericksonlopezf/dotnet-auditing/tree/main/docs/decisions) — ADRs documenting immutable storage, UUIDv7, RLS isolation, and Native AOT decisions.
 
 ---
@@ -190,9 +197,18 @@ dotnet add package EricksonLopez.Auditing.Dapper
 dotnet add package EricksonLopez.Auditing.EntityFrameworkCore
 ```
 
-### 3. Observability & Testing Extensions
+### 3. Resilience, Security & Observability Extensions
 
 ```bash
+# Roslyn Diagnostic Analyzers & Code Fixes
+dotnet add package EricksonLopez.Auditing.Analyzers
+
+# Azure Key Vault Cryptographic Key Rotation
+dotnet add package EricksonLopez.Auditing.AzureKeyVault
+
+# Transactional Outbox Pattern for Resilient Dispatch
+dotnet add package EricksonLopez.Auditing.Outbox
+
 # OpenTelemetry Semantic Tracing & Metrics
 dotnet add package EricksonLopez.Auditing.OpenTelemetry
 
@@ -321,9 +337,9 @@ foreach (AuditRecord entry in result.Records)
 }
 
 // Next page direct index seek (Zero OFFSET overhead)
-if (result.HasMore && result.NextCursorId.HasValue)
+if (result.HasMore && result.NextPageToken is not null)
 {
-    var nextPageQuery = query with { AfterRecordId = result.NextCursorId };
+    var nextPageQuery = query with { ContinuationToken = result.NextPageToken };
     AuditQueryResult nextPage = await auditStore.QueryAsync(nextPageQuery, cancellationToken);
 }
 ```
@@ -519,19 +535,19 @@ public sealed class ComplianceReportExporter
             PageSize = 500
         };
 
-        Guid? cursor = null;
+        string? cursor = null;
         bool hasMore = true;
 
         while (hasMore)
         {
-            var result = await _auditStore.QueryAsync(query with { AfterRecordId = cursor });
+            var result = await _auditStore.QueryAsync(query with { ContinuationToken = cursor });
             foreach (var record in result.Records)
             {
                 yield return record;
             }
 
-            hasMore = result.HasMore && result.NextCursorId.HasValue;
-            cursor = result.NextCursorId;
+            hasMore = result.HasMore && result.NextPageToken is not null;
+            cursor = result.NextPageToken;
         }
     }
 }
@@ -672,6 +688,40 @@ The core engine avoids unconstrained reflection. All JSON serialization is handl
 internal sealed partial class AuditJsonContext : JsonSerializerContext;
 ```
 
+### ASP.NET Core & Minimal APIs Integration
+
+`EricksonLopez.Auditing` integrates naturally into ASP.NET Core Minimal APIs and MVC controllers using endpoint filters and ambient `AuditScope` propagation:
+
+```csharp
+var app = builder.Build();
+
+app.MapPost("/api/v1/orders/{id}/approve", async (string id, IAuditStore auditStore, CancellationToken ct) =>
+{
+    // Handler logic...
+    return TypedResults.Ok(new OrderApprovedResponse(id));
+})
+.WithName("ApproveOrder")
+.Produces<OrderApprovedResponse>(StatusCodes.Status200OK)
+.ProducesProblem(StatusCodes.Status400BadRequest)
+.ProducesProblem(StatusCodes.Status403Forbidden)
+.AddEndpointFilter(async (invocationContext, next) =>
+{
+    using var scope = AuditScope.Begin();
+    scope.WithMetadata("Endpoint", "/api/v1/orders/{id}/approve")
+         .WithMetadata("HttpMethod", "POST");
+
+    return await next(invocationContext);
+});
+```
+
+### Roslyn Diagnostic Analyzers
+
+The `EricksonLopez.Auditing.Analyzers` package enforces compile-time architectural integrity, resource safety, and context propagation rules:
+
+| Diagnostic ID | Severity | Category | Description | CodeFix |
+|---|---|---|---|---|
+| `AUD001` | Warning | Usage | Enforces that `AuditScope.Begin(...)` is captured within a `using` statement or `using` declaration to prevent ambient `AsyncLocal<T>` context leakage into surrounding asynchronous execution flows. | Wrap invocation in `using var scope = AuditScope.Begin();` |
+
 ---
 
 ## 🧪 Testing & Quality
@@ -713,7 +763,7 @@ public sealed class OrderProcessingTests
     {
         // Arrange
         var keyProvider = new TestAuditIntegrityProvider();
-        var hmacService = new HmacAuditIntegrityService(keyProvider);
+        var hmacService = new HmacAuditIntegrityService(keyProvider, new HmacSha256AuditHashAlgorithm());
 
         var originalRecord = AuditRecordBuilder.BuildDefault(
             tenantId: "tenant-sec",
@@ -787,6 +837,9 @@ public sealed class OrderProcessingTests
 | `EricksonLopez.Auditing.EntityFrameworkCore` | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Multi-tenant Index & Query Filters |
 | `EricksonLopez.Auditing.OpenTelemetry` | ✅ | ✅ | ✅ | ✅ | ✅ | W3C TraceContext Activity Enrichment |
 | `EricksonLopez.Auditing.Testing` | ✅ | ✅ | ✅ | ✅ | ✅ | In-Memory Partitioned Isolation |
+| `EricksonLopez.Auditing.Analyzers` | ✅ | ✅ | ✅ | N/A | N/A | Roslyn Diagnostic Rules & CodeFixes (`netstandard2.0`) |
+| `EricksonLopez.Auditing.AzureKeyVault` | ✅ | ✅ | ✅ | ✅ | ✅ | Azure Key Vault KMS Cryptographic Key Rotation |
+| `EricksonLopez.Auditing.Outbox` | ✅ | ✅ | ✅ | ✅ | ✅ | Transactional Outbox Decorator & Channel Buffering |
 
 ### Multi-Tenant Database Security Mechanisms
 
@@ -800,6 +853,8 @@ public sealed class OrderProcessingTests
 | **MongoDB** | BSON Partitioning & Tenant Indexes | `{ tenant_id: @TenantId, ... }` |
 
 ---
+
+> 🛡️ **Target Framework & Lifecycle Policy**: First-class multi-targeting across `.NET 10` (Modern LTS), `.NET 9` (STS), and `.NET 8` (Enterprise LTS) — along with `.NET Standard 2.0` for Roslyn analyzers and source generators — is actively maintained. Full backward compatibility is guaranteed until Microsoft officially reaches End-of-Life (EOL) for .NET 8 and .NET 9 in November 2026, at which milestone the ecosystem will transition to .NET 10 and .NET 11.
 
 ## 🏛️ Architecture & Design Principles
 
@@ -825,6 +880,21 @@ graph TD
     end
     
     B -->|W3C TraceContext & Counters| O[EricksonLopez.Auditing.OpenTelemetry]
+```
+
+### Forensic Record Lifecycle & State Transitions
+
+```mermaid
+stateDiagram-v8
+    [*] --> Draft: Instantiation (AuditRecord)
+    Draft --> Sanitized: AuditSensitivityPipeline (Denylist & Redaction)
+    Sanitized --> Sealed: HmacAuditIntegrityService (Predecessor Hash Chain)
+    Sealed --> Persisting: IAuditStore.AppendAsync() / AppendBatchAsync()
+    Persisting --> Committed: Database Level Multi-Tenant Persistence
+    Persisting --> Failed: Store Unavailable / Storage Exception
+    Failed --> Compensated: FailClosed (Abort) / FailOpen (Log & Continue)
+    Committed --> [*]
+    Compensated --> [*]
 ```
 
 ### Execution Sequence Flow
@@ -857,7 +927,9 @@ sequenceDiagram
 
 ### Cryptographic HMAC-SHA256 Chaining Model
 
-$$\text{CanonicalBytes} = \text{Id} \parallel \text{OccurredAtMs} \parallel \text{TenantId} \parallel \text{ActorType} \parallel \text{ActorId} \parallel \text{ActionCode} \parallel \text{ResourceType} \parallel \text{ResourceId} \parallel \text{Outcome} \parallel \text{PreviousHash}$$
+$$\text{CanonicalBytes} = \text{Id} \parallel \text{OccurredAtMs} \parallel \text{TenantId} \parallel \text{ActorType} \parallel \text{ActorId} \parallel \text{DisplayName} \parallel \text{ActionCode} \parallel \text{ResourceType} \parallel \text{ResourceId} \parallel \text{AggregateType} \parallel \text{AggregateId} \parallel \text{Outcome} \parallel \text{ErrorCode} \parallel \text{CorrelationId} \parallel \text{CausationId} \parallel \text{RequestId} \parallel \text{IpAddress} \parallel \text{UserAgent} \parallel \text{Source} \parallel \text{PreviousHash}$$
+
+> **Note:** The formula above reflects all fields included in the canonical hash computation as implemented in `HmacAuditIntegrityService`. Additional fields beyond the minimal set described in ADR-0004 are included to provide stronger tamper evidence.
 
 $$\text{IntegrityHash} = \text{HMAC-SHA256}(\text{Key}_{\text{tenant}}, \text{CanonicalBytes})$$
 
@@ -914,7 +986,7 @@ graph TD
 | Scenario | ❌ Avoid | ✅ Recommended |
 |---|---|---|
 | **Identity Generation** | Using `Guid.NewGuid()` causing B-Tree index fragmentation | Generating monotonic identifiers with `AuditId.NewId()` (UUIDv7) |
-| **Pagination** | Using SQL `OFFSET / LIMIT` on large audit tables | Using Keyset Cursor Pagination with `AuditQuery.AfterRecordId` ($O(1)$) |
+| **Pagination** | Using SQL `OFFSET / LIMIT` on large audit tables | Using Keyset Cursor Pagination with `AuditQuery.ContinuationToken` ($O(1)$) |
 | **Sensitive Data** | Storing plain-text passwords, tokens, or PII in changes | Using `AuditChange.Redacted()` or `AuditSensitivityPipeline.HashValue()` |
 | **Error Logging** | Writing raw exception stack traces to `AuditRecord.ErrorCode` | Using structured, bounded error codes (`AUTHZ_FORBIDDEN`, `VALIDATION_FAILED`) |
 | **High-Volume Ingestion**| Issuing single `AppendAsync` calls in a tight loop ($N$ round-trips)| Grouping by tenant and calling `AppendBatchAsync()` (1 round-trip) |
