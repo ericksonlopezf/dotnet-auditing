@@ -13,19 +13,29 @@ namespace EricksonLopez.Auditing.EntityFrameworkCore;
 public sealed class EfCoreAuditStore : IAuditStore
 {
     private readonly IDbContextFactory<AuditDbContext> _contextFactory;
+    private readonly IAuditSensitivityPipeline? _sensitivityPipeline;
 
     /// <summary>Initializes a new instance of the <see cref="EfCoreAuditStore"/> class.</summary>
     /// <param name="contextFactory">The database context factory used to create <see cref="AuditDbContext"/> instances.</param>
+    /// <param name="sensitivityPipeline">The optional sensitivity pipeline to sanitize records before persistence.</param>
     /// <exception cref="ArgumentNullException"><paramref name="contextFactory"/> is <see langword="null"/></exception>
-    public EfCoreAuditStore(IDbContextFactory<AuditDbContext> contextFactory)
+    public EfCoreAuditStore(
+        IDbContextFactory<AuditDbContext> contextFactory,
+        IAuditSensitivityPipeline? sensitivityPipeline = null)
     {
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+        _sensitivityPipeline = sensitivityPipeline;
     }
 
     /// <inheritdoc/>
     public async ValueTask AppendAsync(AuditRecord record, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(record);
+
+        if (_sensitivityPipeline is not null)
+        {
+            record = await _sensitivityPipeline.SanitizeAsync(record, cancellationToken).ConfigureAwait(false);
+        }
 
         await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
         var entity = ToEntity(record);
@@ -40,6 +50,16 @@ public sealed class EfCoreAuditStore : IAuditStore
         if (records.Count == 0)
             return;
 
+        if (_sensitivityPipeline is not null)
+        {
+            var sanitized = new List<AuditRecord>(records.Count);
+            for (int i = 0; i < records.Count; i++)
+            {
+                sanitized.Add(await _sensitivityPipeline.SanitizeAsync(records[i], cancellationToken).ConfigureAwait(false));
+            }
+            records = sanitized;
+        }
+
         await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
         var entities = records.Select(ToEntity).ToList();
         context.AuditRecords.AddRange(entities);
@@ -50,12 +70,12 @@ public sealed class EfCoreAuditStore : IAuditStore
     public async ValueTask<AuditQueryResult> QueryAsync(AuditQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        ArgumentException.ThrowIfNullOrWhiteSpace(query.TenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(query.TenantId.Value, nameof(query.TenantId));
 
         await using var context = await _contextFactory.CreateDbContextAsync(cancellationToken);
 
         var dbQuery = context.AuditRecords.AsNoTracking()
-            .Where(e => e.TenantId == query.TenantId);
+            .Where(e => e.TenantId == query.TenantId.Value);
 
         if (!string.IsNullOrWhiteSpace(query.ActorId))
             dbQuery = dbQuery.Where(e => e.ActorId == query.ActorId);
@@ -84,18 +104,21 @@ public sealed class EfCoreAuditStore : IAuditStore
         if (!string.IsNullOrWhiteSpace(query.CorrelationId))
             dbQuery = dbQuery.Where(e => e.CorrelationId == query.CorrelationId);
 
-        if (query.AfterRecordId.HasValue)
-            dbQuery = dbQuery.Where(e => e.Id > query.AfterRecordId.Value);
+        if (AuditCursorToken.TryParse(query.ContinuationToken, out var cursorDate, out var cursorId))
+        {
+            dbQuery = dbQuery.Where(e => e.OccurredAt > cursorDate || (e.OccurredAt == cursorDate && e.Id > cursorId));
+        }
 
         var pageSize = Math.Clamp(query.PageSize, 1, 1000);
         var entities = await dbQuery
-            .OrderBy(e => e.Id)
+            .OrderBy(e => e.OccurredAt)
+            .ThenBy(e => e.Id)
             .Take(pageSize + 1)
             .ToListAsync(cancellationToken);
 
         var hasMore = entities.Count > pageSize;
         var pageEntities = entities.Take(pageSize).ToList();
-        var nextCursor = hasMore ? pageEntities[^1].Id : (Guid?)null;
+        var nextCursor = hasMore ? AuditCursorToken.Create(pageEntities[^1].OccurredAt, pageEntities[^1].Id) : null;
 
         var records = pageEntities.Select(ToRecord).ToList();
         return new AuditQueryResult(records, nextCursor, hasMore);
@@ -131,6 +154,7 @@ public sealed class EfCoreAuditStore : IAuditStore
             RequestId = record.Context.RequestId,
             IpAddress = record.Context.IpAddress,
             UserAgent = record.Context.UserAgent,
+            IdempotencyKey = record.Context.IdempotencyKey,
             ChangesJson = changesJson,
             IntegrityHash = record.IntegrityHash,
             PreviousHash = record.PreviousHash
@@ -157,7 +181,7 @@ public sealed class EfCoreAuditStore : IAuditStore
             Action = new AuditAction(entity.ActionCode),
             Resource = new AuditResource(entity.ResourceType, entity.ResourceId, entity.AggregateType, entity.AggregateId),
             Outcome = (AuditOutcome)entity.Outcome,
-            Context = new AuditContext(entity.TenantId, entity.Source, entity.CorrelationId, entity.CausationId, entity.RequestId, entity.IpAddress, entity.UserAgent),
+            Context = new AuditContext(entity.TenantId, entity.Source, entity.CorrelationId, entity.CausationId, entity.RequestId, entity.IpAddress, entity.UserAgent, entity.IdempotencyKey),
             Changes = changes,
             ErrorCode = entity.ErrorCode,
             IntegrityHash = entity.IntegrityHash,
@@ -165,3 +189,4 @@ public sealed class EfCoreAuditStore : IAuditStore
         };
     }
 }
+

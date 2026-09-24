@@ -1,6 +1,6 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- EricksonLopez.Auditing — PostgreSQL Schema Migration
--- Version: 1.0.0
+-- Version: 2.0.0
 -- Description:
 --   Creates the audit schema, the partitioned records table, RLS policies,
 --   indexes optimized for tenant-scoped queries, and an initial monthly partition.
@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS audit.records (
     request_id      TEXT,
     ip_address      INET,
     user_agent      TEXT,
+    idempotency_key TEXT,
 
     -- Actor
     actor_type      SMALLINT        NOT NULL,   -- AuditActorType enum value
@@ -83,12 +84,17 @@ CREATE TABLE IF NOT EXISTS audit.records (
 )
 PARTITION BY RANGE (occurred_at);
 
--- ── Initial partition (current month) ────────────────────────────────────────
+-- ── Initial and default partitions ──────────────────────────────────────────
 
--- This creates an initial partition. In production, use pg_partman to automate this.
+-- Monthly partition for 2026-08 (in production, pre-create upcoming monthly partitions or use pg_partman)
 CREATE TABLE IF NOT EXISTS audit.records_2026_08
     PARTITION OF audit.records
     FOR VALUES FROM ('2026-08-01 00:00:00+00') TO ('2026-09-01 00:00:00+00');
+
+-- Default partition catches all records outside explicitly provisioned monthly ranges,
+-- completely preventing fatal 23F00 ("no partition of relation 'records' found for row") exceptions.
+CREATE TABLE IF NOT EXISTS audit.records_default
+    PARTITION OF audit.records DEFAULT;
 
 -- ── Indexes ───────────────────────────────────────────────────────────────────
 
@@ -112,6 +118,11 @@ CREATE INDEX IF NOT EXISTS ix_audit_records_correlation
 -- Outcome + action for security/compliance dashboards
 CREATE INDEX IF NOT EXISTS ix_audit_records_action_outcome
     ON audit.records (tenant_id, action_code, outcome, occurred_at DESC);
+
+-- Integrity chain index (prevents forks)
+CREATE UNIQUE INDEX IF NOT EXISTS ix_audit_chain
+    ON audit.records (tenant_id, previous_hash)
+    WHERE previous_hash IS NOT NULL;
 
 -- ── Row-Level Security ────────────────────────────────────────────────────────
 

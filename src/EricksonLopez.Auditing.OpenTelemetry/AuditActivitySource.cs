@@ -10,7 +10,7 @@ public static class AuditActivitySource
     public const string ActivitySourceName = "EricksonLopez.Auditing";
 
     /// <summary>Gets the <see cref="ActivitySource"/> instance used for creating audit telemetry spans.</summary>
-    public static readonly ActivitySource Source = new(ActivitySourceName, "1.0.0");
+    public static readonly ActivitySource Source = new(ActivitySourceName, "2.0.0");
 
     /// <summary>Defines semantic attribute names following OpenTelemetry conventions for audit spans.</summary>
     public static class Tags

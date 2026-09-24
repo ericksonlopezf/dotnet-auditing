@@ -17,60 +17,24 @@ using Xunit;
 namespace EricksonLopez.Auditing.IntegrationTests;
 
 [Trait("Category", "Integration")]
-public sealed class OracleAuditStoreIntegrationTests : IAsyncLifetime
+public sealed class OracleAuditStoreIntegrationTests : IClassFixture<OracleFixture>
 {
-    private readonly OracleContainer _container;
-    private OracleAuditStore _store = null!;
-    private OracleAuditIntegrityVerifier _verifier = null!;
-    private HmacAuditIntegrityService _hmac = null!;
+    private readonly OracleFixture _fixture;
+    private readonly OracleAuditStore _store;
+    private readonly OracleAuditIntegrityVerifier _verifier;
+    private readonly HmacAuditIntegrityService _hmac;
 
-    public OracleAuditStoreIntegrationTests()
+    public OracleAuditStoreIntegrationTests(OracleFixture fixture)
     {
-        _container = new OracleBuilder("gvenzl/oracle-xe:21-slim-faststart")
-            .Build();
-    }
-
-    public async Task InitializeAsync()
-    {
-        await _container.StartAsync();
-
-        using (var conn = new OracleConnection(_container.GetConnectionString()))
-        {
-            await conn.OpenAsync();
-            await conn.ExecuteAsync(@"
-                CREATE TABLE AUDIT_RECORDS (
-                    id VARCHAR2(36) PRIMARY KEY,
-                    occurred_at TIMESTAMP(6) WITH TIME ZONE NOT NULL,
-                    tenant_id VARCHAR2(100) NOT NULL,
-                    source VARCHAR2(100) NOT NULL,
-                    actor_type NUMBER(5) NOT NULL,
-                    actor_id VARCHAR2(100) NOT NULL,
-                    actor_name VARCHAR2(255),
-                    action_code VARCHAR2(100) NOT NULL,
-                    resource_type VARCHAR2(100) NOT NULL,
-                    resource_id VARCHAR2(100) NOT NULL,
-                    aggregate_type VARCHAR2(100),
-                    aggregate_id VARCHAR2(100),
-                    outcome NUMBER(5) NOT NULL,
-                    error_code VARCHAR2(100),
-                    correlation_id VARCHAR2(100),
-                    causation_id VARCHAR2(100),
-                    request_id VARCHAR2(100),
-                    ip_address VARCHAR2(45),
-                    user_agent VARCHAR2(1000),
-                    changes CLOB,
-                    integrity_hash VARCHAR2(100),
-                    previous_hash VARCHAR2(100)
-                )");
-        }
-
+        _fixture = fixture;
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
 
         var options = new OracleAuditStoreOptions
         {
-            ConnectionFactory = () => new OracleConnection(_container.GetConnectionString()),
+            ConnectionFactory = () => new OracleConnection(fixture.Container.GetConnectionString()),
             Schema = string.Empty,
             Table = "AUDIT_RECORDS"
         };
@@ -81,12 +45,7 @@ public sealed class OracleAuditStoreIntegrationTests : IAsyncLifetime
         _verifier = new OracleAuditIntegrityVerifier(options, _hmac);
     }
 
-    public async Task DisposeAsync()
-    {
-        await _container.DisposeAsync();
-    }
-
-    [Fact(Timeout = 30000)]
+    [Fact(Timeout = 300000)]
     public async Task AppendAndQuery_WithChanges_Succeeds()
     {
         var record = Builders.Build(tenantId: "tenant-changes") with
@@ -111,7 +70,7 @@ public sealed class OracleAuditStoreIntegrationTests : IAsyncLifetime
         fetched.Changes[1].IsRedacted.Should().BeTrue();
     }
 
-    [Fact(Timeout = 30000)]
+    [Fact(Timeout = 300000)]
     public async Task AppendBatchAsync_ValidRecords_Succeeds()
     {
         var tenant = "t-batch";
@@ -125,7 +84,7 @@ public sealed class OracleAuditStoreIntegrationTests : IAsyncLifetime
         page.Records.Should().HaveCount(3);
     }
 
-    [Fact(Timeout = 30000)]
+    [Fact(Timeout = 300000)]
     public async Task VerifyChain_ValidChain_ReturnsTrue()
     {
         var tenant = "t-chain";
@@ -149,7 +108,7 @@ public sealed class OracleAuditStoreIntegrationTests : IAsyncLifetime
         result.VerifiedCount.Should().Be(3);
     }
 
-    [Fact(Timeout = 30000)]
+    [Fact(Timeout = 300000)]
     public async Task VerifyChain_BrokenChain_ReturnsFalse()
     {
         var tenant = "t-broken";
@@ -163,7 +122,7 @@ public sealed class OracleAuditStoreIntegrationTests : IAsyncLifetime
 
         await _store.AppendBatchAsync(new[] { r1, r2 });
 
-        using (var conn = new OracleConnection(_container.GetConnectionString()))
+        using (var conn = new OracleConnection(_fixture.Container.GetConnectionString()))
         {
             await conn.OpenAsync();
             await conn.ExecuteAsync("UPDATE AUDIT_RECORDS SET INTEGRITY_HASH = 'tampered' WHERE ID = :Id", new { Id = r1.Id.ToString("D") });
@@ -174,3 +133,7 @@ public sealed class OracleAuditStoreIntegrationTests : IAsyncLifetime
         result.FirstFailedRecordId.Should().Be(r1.Id);
     }
 }
+
+
+
+

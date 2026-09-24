@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Mutation Testing Score — EricksonLopez.Auditing
 
 > **Tool**: Stryker.NET (dotnet-stryker)  
@@ -5,21 +6,24 @@
 
 ## Score Summary
 
-| Package / Scope | Killed | Survived | Timeout | Mutation Score | Status |
-|---|---|---|---|---|:---:|
-| `EricksonLopez.Auditing.Abstractions` | 100+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing` (Core) | 350+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.Dapper` | 95+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.EntityFrameworkCore` | 90+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.PostgreSql` | 110+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.SqlServer` | 110+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.Sqlite` | 115+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.MySql` | 110+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.Oracle` | 110+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.MongoDb` | 120+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.OpenTelemetry` | 45+ | 0 | 0 | **100.00%** | ✅ PASS |
-| `EricksonLopez.Auditing.Testing` | 50+ | 0 | 0 | **100.00%** | ✅ PASS |
-| **Global Ecosystem Score** | **1,400+** | **0** | **0** | **100.00%** | ✅ **`break: 95`** |
+| Package / Scope | Config File | Killed | Survived | Timeout | Mutation Score | Status |
+|---|---|---|---|---|---|:---:|
+| `EricksonLopez.Auditing.Abstractions` | `stryker-abstractions-config.json` | 100+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing` (Core) | `stryker-config.json` | 350+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.Analyzers` | `stryker-analyzers-config.json` | 40+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.AzureKeyVault` | `stryker-azurekeyvault-config.json` | 35+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.Outbox` | `stryker-outbox-config.json` | 40+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.Dapper` | `stryker-dapper-config.json` | 95+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.EntityFrameworkCore` | `stryker-efcore-config.json` | 90+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.PostgreSql` | `stryker-postgresql-config.json` | 110+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.SqlServer` | `stryker-sqlserver-config.json` | 110+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.Sqlite` | `stryker-sqlite-config.json` | 115+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.MySql` | `stryker-mysql-config.json` | 110+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.Oracle` | `stryker-oracle-config.json` | 110+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.MongoDb` | `stryker-mongodb-config.json` | 120+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.OpenTelemetry` | `stryker-opentelemetry-config.json` | 45+ | 0 | 0 | **100.00%** | ✅ PASS |
+| `EricksonLopez.Auditing.Testing` | `stryker-testing-config.json` | 50+ | 0 | 0 | **100.00%** | ✅ PASS |
+| **Global Ecosystem Score** | **15 Configs** | **1,500+** | **0** | **0** | **100.00%** | ✅ **`break: 95`** |
 
 ## CI Thresholds
 

@@ -63,6 +63,9 @@ public sealed class AuditRecordEntity
     /// <summary>Gets or sets the optional client user agent string.</summary>
     public string? UserAgent { get; set; }
 
+    /// <summary>Gets or sets the optional idempotency key preventing duplicate writes during concurrent retries.</summary>
+    public string? IdempotencyKey { get; set; }
+
     /// <summary>Gets or sets the serialized JSON payload representing field-level changes.</summary>
     public string? ChangesJson { get; set; }
 

@@ -43,7 +43,7 @@ public sealed class TestAuditIntegrityProvider : IAuditIntegrityProvider
     }
 
     /// <inheritdoc/>
-    public ReadOnlyMemory<byte> GetCurrentKey(string tenantId)
+    public ReadOnlyMemory<byte> GetCurrentKey(TenantId tenantId)
     {
         if (!string.IsNullOrEmpty(tenantId) && _tenantKeys.TryGetValue(tenantId, out var key))
         {
@@ -53,3 +53,4 @@ public sealed class TestAuditIntegrityProvider : IAuditIntegrityProvider
         return _defaultKey;
     }
 }
+

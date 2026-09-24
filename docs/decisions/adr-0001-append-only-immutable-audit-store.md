@@ -1,4 +1,11 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # ADR-0001: Append-Only Immutable Storage Contract (`IAuditStore`)
+
+## Status
+Accepted
+
+## Date
+2026-09-04
 
 ## Context
 

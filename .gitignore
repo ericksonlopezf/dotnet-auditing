@@ -1,4 +1,8 @@
-## Visual Studio / Rider / VS Code
+# ==============================================================================
+# Git Ignore Configuration — EricksonLopez.Auditing Ecosystem
+# ==============================================================================
+
+## ── Visual Studio / JetBrains Rider / VS Code ────────────────────────────────
 .vs/
 .idea/
 .vscode/
@@ -6,29 +10,79 @@
 *.userosscache
 *.sln.docstates
 *.suo
+*.DotSettings.user
+.ionide/
 
-## Build results
+## ── Build & Compiler Outputs ─────────────────────────────────────────────────
 [Bb]in/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
 [Tt]emp/
+generated/
+
+## ── Test Execution, Mutation & Coverage ──────────────────────────────────────
 TestResults/
+test-results/
 coveragereport/
 coveragereport_html/
 StrykerOutput/
 all-summaries/
-test-results/
+*.trx
+*.coverage
+*.coveragexml
+*.opencover.xml
+*.cobertura.xml
+
+## ── BenchmarkDotNet & Profiling Artifacts ─────────────────────────────────────
+**/BenchmarkDotNet.Artifacts/
+BenchmarkDotNet.Artifacts/
+benchmarks/results/*
+!benchmarks/results/baseline.json
+
+## ── NuGet Packaging Artifacts ────────────────────────────────────────────────
 nupkgs/
+*.nupkg
+*.snupkg
+packages/
+project.lock.json
+project.assets.json
 
-## Certificates & Secrets
+## ── Forensic Scaffolding & Extracted Metadata ────────────────
+scripts/api_inventory.json
+scripts/extracted_api.json
+scripts/inventory_*.txt
+*.report.json
+
+## ── Certificates, Keys & Secrets ─────────────────────────────────────────────
 *.pfx
+*.p12
 *.key
+*.pem
+appsettings*.local.json
+local.settings.json
+.env
+.env.*
+!.env.example
 
-## Temporary & Scratch
+## ── Local Databases & Temporary Storage ──────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
 TestOracle/
 hash_test.cs
 generate_tests.csx
-*.trx
-*.opencover.xml
-*.cobertura.xml
+
+## ── Crash Dumps & OS System Artifacts ────────────────────────────────────────
+*.dmp
+*.mdmp
+Thumbs.db
+ehthumbs.db
+[Dd]esktop.ini
+.DS_Store
+.AppleDouble
+.LSOverride
