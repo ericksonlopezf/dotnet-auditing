@@ -1,11 +1,13 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 <Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" Condition="Exists($([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../')))" />
 
   <PropertyGroup>
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionPrefix>2.0.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
 
     <Authors>Erickson Lopez</Authors>
-    <Company>EricksonLopez</Company>
+    <Company>Erickson Lopez</Company>
     <Copyright>Copyright © 2026 Erickson Lopez.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://ericksonlopez.dev/auditing</PackageProjectUrl>
@@ -25,7 +27,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);NU1902;NU1903;NU1904</NoWarn>
 
-    <IsAotCompatible Condition="'$(IsAotCompatible)' == ''">true</IsAotCompatible>
+    <!-- IsAotCompatible removed: Dapper v2.1.79 uses Reflection.Emit -->
     <EnableTrimAnalyzer Condition="'$(EnableTrimAnalyzer)' == ''">true</EnableTrimAnalyzer>
 
     <!-- SourceLink and Symbol Packaging -->
@@ -44,4 +46,7 @@
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
 </Project>

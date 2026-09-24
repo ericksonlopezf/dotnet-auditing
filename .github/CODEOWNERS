@@ -11,9 +11,10 @@ Directory.Packages.props @ericksonlopezf
 # Core and Abstractions
 /src/EricksonLopez.Auditing.Abstractions/ @ericksonlopezf
 /src/EricksonLopez.Auditing/ @ericksonlopezf
+/src/EricksonLopez.Auditing.Analyzers/ @ericksonlopezf
 /src/EricksonLopez.Auditing.Testing/ @ericksonlopezf
 
-# Database and ORM Adapters
+# Database, ORM & Enterprise Adapters
 /src/EricksonLopez.Auditing.PostgreSql/ @ericksonlopezf
 /src/EricksonLopez.Auditing.SqlServer/ @ericksonlopezf
 /src/EricksonLopez.Auditing.MySql/ @ericksonlopezf
@@ -22,6 +23,8 @@ Directory.Packages.props @ericksonlopezf
 /src/EricksonLopez.Auditing.Dapper/ @ericksonlopezf
 /src/EricksonLopez.Auditing.EntityFrameworkCore/ @ericksonlopezf
 /src/EricksonLopez.Auditing.MongoDb/ @ericksonlopezf
+/src/EricksonLopez.Auditing.AzureKeyVault/ @ericksonlopezf
+/src/EricksonLopez.Auditing.Outbox/ @ericksonlopezf
 
 # Observability
 /src/EricksonLopez.Auditing.OpenTelemetry/ @ericksonlopezf

@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "EricksonLopez.Auditing.Abstractions.csproj",
     "test-projects": [
-      "EricksonLopez.Auditing.Abstractions.Tests.csproj"
+      "tests/EricksonLopez.Auditing.Abstractions.Tests/EricksonLopez.Auditing.Abstractions.Tests.csproj"
     ],
     "mutate": [
       "**/*.cs",
@@ -21,6 +21,11 @@
       "json",
       "cleartext",
       "progress"
+    ],
+    "concurrency": 2,
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose"
     ]
   }
 }

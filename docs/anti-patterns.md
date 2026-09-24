@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Anti-Patterns in Audit Logging & Persistence
 
 This document identifies anti-patterns in audit logging, security compliance, and persistence design, explaining why they are prohibited in `EricksonLopez.Auditing` and how to resolve them.

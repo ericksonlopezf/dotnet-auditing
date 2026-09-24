@@ -1,3 +1,4 @@
+# Copyright © Erickson Lopez. MIT License.
 # Top-most EditorConfig file for EricksonLopez.Auditing ecosystem
 root = true
 
@@ -90,6 +91,7 @@ dotnet_diagnostic.CS0618.severity = error     # Member is obsolete (Zero toleran
 dotnet_diagnostic.CS0619.severity = error     # Member is obsolete (Zero tolerance)
 dotnet_diagnostic.xUnit1051.severity = warning # xUnit analyzer checks
 dotnet_diagnostic.CS1591.severity = warning   # Missing XML comment for publicly visible type or member
+dotnet_diagnostic.CS0159.severity = error     # Goto label not found / bad branching
 
 # Test Projects Overrides
 [tests/**.cs]

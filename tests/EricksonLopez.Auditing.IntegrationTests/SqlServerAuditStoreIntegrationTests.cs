@@ -58,6 +58,7 @@ public sealed class SqlServerAuditStoreIntegrationTests : IAsyncLifetime
                     request_id NVARCHAR(100),
                     ip_address NVARCHAR(45),
                     user_agent NVARCHAR(1000),
+                    idempotency_key NVARCHAR(128),
                     changes NVARCHAR(MAX),
                     integrity_hash NVARCHAR(100),
                     previous_hash NVARCHAR(100)
@@ -66,6 +67,7 @@ public sealed class SqlServerAuditStoreIntegrationTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
 
         var options = new SqlServerAuditStoreOptions
@@ -174,3 +176,7 @@ public sealed class SqlServerAuditStoreIntegrationTests : IAsyncLifetime
         result.FirstFailedRecordId.Should().Be(r1.Id);
     }
 }
+
+
+
+

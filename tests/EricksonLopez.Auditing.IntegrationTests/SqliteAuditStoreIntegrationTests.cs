@@ -51,6 +51,7 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
                     request_id      TEXT    NULL,
                     ip_address      TEXT    NULL,
                     user_agent      TEXT    NULL,
+                    idempotency_key TEXT    NULL,
                     changes         TEXT    NULL,
                     integrity_hash  TEXT    NULL,
                     previous_hash   TEXT    NULL,
@@ -67,7 +68,7 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
         };
 
         _store = new SqliteAuditStore(options);
-        _hmac = new HmacAuditIntegrityService(new TestAuditIntegrityProvider());
+        _hmac = new HmacAuditIntegrityService(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
         _verifier = new SqliteAuditIntegrityVerifier(options, _hmac);
     }
 
@@ -94,7 +95,7 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
         result.Records.Should().HaveCount(1);
         result.Records[0].Id.Should().Be(record.Id);
         result.Records[0].Actor.Id.Should().Be("alice");
-        result.Records[0].Context.TenantId.Should().Be("tenant-sql-1");
+        result.Records[0].Context.TenantId.Value.Should().Be("tenant-sql-1");
     }
 
     [Fact(Timeout = 30000)]
@@ -129,13 +130,13 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
         var page1 = await _store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2 });
         page1.Records.Should().HaveCount(2);
         page1.HasMore.Should().BeTrue();
-        page1.NextCursorId.Should().NotBeNull();
+        page1.NextPageToken.Should().NotBeNull();
 
         var page2 = await _store.QueryAsync(new AuditQuery
         {
             TenantId = tenant,
             PageSize = 2,
-            AfterRecordId = page1.NextCursorId
+            ContinuationToken = page1.NextPageToken
         });
         page2.Records.Should().HaveCount(2);
         page2.HasMore.Should().BeTrue();
@@ -144,11 +145,11 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
         {
             TenantId = tenant,
             PageSize = 2,
-            AfterRecordId = page2.NextCursorId
+            ContinuationToken = page2.NextPageToken
         });
         page3.Records.Should().HaveCount(1);
         page3.HasMore.Should().BeFalse();
-        page3.NextCursorId.Should().BeNull();
+        page3.NextPageToken.Should().BeNull();
     }
 
     [Fact(Timeout = 30000)]
@@ -386,7 +387,7 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
         var emptyQuery = await _store.QueryAsync(new AuditQuery { TenantId = "non-existent-tenant" });
         emptyQuery.Records.Should().BeEmpty();
         emptyQuery.HasMore.Should().BeFalse();
-        emptyQuery.NextCursorId.Should().BeNull();
+        emptyQuery.NextPageToken.Should().BeNull();
     }
 
     [Fact]
@@ -399,6 +400,7 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => builder.UseSqlite(null!));
 
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
         builder.UseSqlite(options =>
         {
@@ -484,7 +486,7 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
         var p2 = await _store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 2 });
         p2.Records.Should().HaveCount(2);
         p2.HasMore.Should().BeFalse();
-        p2.NextCursorId.Should().BeNull();
+        p2.NextPageToken.Should().BeNull();
 
         // PageSize = 1000 (max valid)
         var p1000 = await _store.QueryAsync(new AuditQuery { TenantId = tenant, PageSize = 1000 });
@@ -573,3 +575,8 @@ public sealed class SqliteAuditStoreIntegrationTests : IDisposable
         res.Records.Should().HaveCount(1);
     }
 }
+
+
+
+
+

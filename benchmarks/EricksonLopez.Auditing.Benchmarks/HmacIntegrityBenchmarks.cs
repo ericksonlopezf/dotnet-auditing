@@ -15,7 +15,7 @@ public class HmacIntegrityBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        _hmac = new HmacAuditIntegrityService(new TestAuditIntegrityProvider());
+        _hmac = new HmacAuditIntegrityService(new TestAuditIntegrityProvider(), new HmacSha256AuditHashAlgorithm());
         var baseRecord = AuditRecordBuilder.BuildDefault(
             tenantId: "tenant-benchmarks",
             actorId: "actor-123",
@@ -43,3 +43,4 @@ public class HmacIntegrityBenchmarks
         return _hmac.Verify(_record);
     }
 }
+

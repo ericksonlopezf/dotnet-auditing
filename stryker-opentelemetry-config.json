@@ -2,7 +2,7 @@
   "stryker-config": {
     "project": "EricksonLopez.Auditing.OpenTelemetry.csproj",
     "test-projects": [
-      "EricksonLopez.Auditing.OpenTelemetry.Tests.csproj"
+      "tests/EricksonLopez.Auditing.OpenTelemetry.Tests/EricksonLopez.Auditing.OpenTelemetry.Tests.csproj"
     ],
     "mutate": [
       "**/*.cs",
@@ -21,6 +21,11 @@
       "json",
       "cleartext",
       "progress"
+    ],
+    "concurrency": 2,
+    "ignore-methods": [
+      "ConfigureAwait",
+      "Dispose"
     ]
   }
 }

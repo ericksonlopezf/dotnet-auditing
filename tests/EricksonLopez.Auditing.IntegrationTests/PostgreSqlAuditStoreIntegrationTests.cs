@@ -59,6 +59,7 @@ public sealed class PostgreSqlAuditStoreIntegrationTests : IAsyncLifetime
                     ip_address VARCHAR(45),
                     user_agent VARCHAR(1000),
                     changes JSONB,
+                    idempotency_key VARCHAR(128),
                     integrity_hash VARCHAR(100),
                     previous_hash VARCHAR(100)
                 );");
@@ -66,6 +67,7 @@ public sealed class PostgreSqlAuditStoreIntegrationTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
 
         var options = new PostgreSqlAuditStoreOptions
@@ -174,3 +176,7 @@ public sealed class PostgreSqlAuditStoreIntegrationTests : IAsyncLifetime
         result.FirstFailedRecordId.Should().Be(r1.Id);
     }
 }
+
+
+
+

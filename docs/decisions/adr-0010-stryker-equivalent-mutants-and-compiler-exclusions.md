@@ -1,7 +1,8 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # ADR-0010: Stryker Equivalent Mutants & Compiler Exclusions
 
 ## Status
-**Accepted**
+Accepted
 
 ## Date
 2026-08-26

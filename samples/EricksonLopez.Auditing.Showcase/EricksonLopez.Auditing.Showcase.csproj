@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
@@ -20,6 +21,8 @@
     <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Dapper\EricksonLopez.Auditing.Dapper.csproj" />
     <ProjectReference Include="..\..\src\EricksonLopez.Auditing.EntityFrameworkCore\EricksonLopez.Auditing.EntityFrameworkCore.csproj" />
     <ProjectReference Include="..\..\src\EricksonLopez.Auditing.OpenTelemetry\EricksonLopez.Auditing.OpenTelemetry.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.AzureKeyVault\EricksonLopez.Auditing.AzureKeyVault.csproj" />
+    <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Outbox\EricksonLopez.Auditing.Outbox.csproj" />
     <ProjectReference Include="..\..\src\EricksonLopez.Auditing.Testing\EricksonLopez.Auditing.Testing.csproj" />
   </ItemGroup>
 

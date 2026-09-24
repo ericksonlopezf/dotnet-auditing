@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # Project Governance
 
 This document outlines the governance model for the `EricksonLopez.Auditing` project ecosystem.
@@ -28,7 +29,7 @@ Contributors are community members who participate by opening issues, improving 
 
 1. **Minor Changes & Bug Fixes**: Decisions are made through standard code review on Pull Requests. Approval by a Maintainer is required to merge.
 2. **Major Features & Architectural Changes**: Proposals must be initiated via GitHub Discussions or an issue. Once consensus is reached, an Architectural Decision Record (ADR) will be created in `docs/decisions/`.
-3. **Breaking Changes**: Breaking changes are strictly limited to major version updates (e.g., `3.0.0`) and require formal review by Maintainers.
+3. **Breaking Changes**: Breaking changes are strictly limited to major version updates (e.g., `2.0.0`) and require formal review by Maintainers.
 
 ## 📢 Licensing & Intellectual Property
 

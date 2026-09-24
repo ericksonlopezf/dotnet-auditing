@@ -1,3 +1,4 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 # EricksonLopez.Auditing — Test Suite Documentation
 
 This test suite guarantees the reliability, immutability, multi-tenant isolation, and cryptographic security of `EricksonLopez.Auditing` across all domain abstractions and persistence adapters.
@@ -18,6 +19,7 @@ tests/
 │   └── FakeDbTransaction.cs
 ├── EricksonLopez.Auditing.Abstractions.Tests/          # AuditId, UUIDv7, value objects, SPI contracts
 ├── EricksonLopez.Auditing.Tests/                       # Core engine, AuditScope, HMAC chain, sensitivity pipeline
+├── EricksonLopez.Auditing.Analyzers.Tests/             # Roslyn analyzer & code fix verification tests
 ├── EricksonLopez.Auditing.Dapper.Tests/                # Dapper raw SQL adapter unit tests
 ├── EricksonLopez.Auditing.EntityFrameworkCore.Tests/   # EF Core change interception & store unit tests
 ├── EricksonLopez.Auditing.PostgreSql.Tests/            # PostgreSQL provider unit tests (FakeDb)

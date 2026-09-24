@@ -77,7 +77,7 @@ public sealed class InMemoryAuditStore : IAuditStore
         cancellationToken.ThrowIfCancellationRequested();
 
         IEnumerable<AuditRecord> filtered = _records
-            .Where(r => r.Context.TenantId == query.TenantId)
+            .Where(r => r.Context.TenantId == query.TenantId.Value)
             .Where(r => query.ActorId is null || r.Actor.Id == query.ActorId)
             .Where(r => query.ActionCode is null || r.Action.Code == query.ActionCode)
             .Where(r => query.ResourceType is null || r.Resource.Type == query.ResourceType)
@@ -90,10 +90,9 @@ public sealed class InMemoryAuditStore : IAuditStore
             .ThenBy(r => r.Id);
 
         // Keyset pagination: skip records up to and including the cursor
-        if (query.AfterRecordId.HasValue)
+        if (AuditCursorToken.TryParse(query.ContinuationToken, out var cursorDate, out var cursorId))
         {
-            var afterId = query.AfterRecordId.Value;
-            filtered = filtered.SkipWhile(r => r.Id != afterId).Skip(1);
+            filtered = filtered.Where(r => r.OccurredAt > cursorDate || (r.OccurredAt == cursorDate && r.Id > cursorId));
         }
 
         var page = filtered.Take(query.PageSize + 1).ToList();
@@ -101,7 +100,8 @@ public sealed class InMemoryAuditStore : IAuditStore
 
         if (hasMore) page.RemoveAt(page.Count - 1);
 
-        var nextCursor = hasMore ? page[^1].Id : (Guid?)null;
+        var nextCursor = hasMore ? AuditCursorToken.Create(page[^1].OccurredAt, page[^1].Id) : null;
         return ValueTask.FromResult(new AuditQueryResult(page, nextCursor, hasMore));
     }
 }
+

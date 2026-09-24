@@ -1,3 +1,4 @@
+# Copyright © Erickson Lopez. MIT License.
 # ─── Codecov Configuration ───────────────────────────────────────────────────
 # Full documentation: https://docs.codecov.com/docs/codecov-yaml
 # Validate this file: curl -X POST --data-binary @.codecov.yml https://codecov.io/validate

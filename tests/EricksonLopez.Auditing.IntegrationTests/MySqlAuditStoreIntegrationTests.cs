@@ -58,6 +58,7 @@ public sealed class MySqlAuditStoreIntegrationTests : IAsyncLifetime
                     request_id VARCHAR(100),
                     ip_address VARCHAR(45),
                     user_agent VARCHAR(1000),
+                    idempotency_key VARCHAR(100),
                     changes JSON,
                     integrity_hash VARCHAR(100),
                     previous_hash VARCHAR(100)
@@ -66,6 +67,7 @@ public sealed class MySqlAuditStoreIntegrationTests : IAsyncLifetime
 
         var services = new ServiceCollection();
         services.AddSingleton<IAuditIntegrityProvider, TestAuditIntegrityProvider>();
+        services.AddSingleton<IAuditHashAlgorithm, HmacSha256AuditHashAlgorithm>();
         services.AddSingleton<HmacAuditIntegrityService>();
 
         var options = new MySqlAuditStoreOptions
@@ -173,3 +175,7 @@ public sealed class MySqlAuditStoreIntegrationTests : IAsyncLifetime
         result.FirstFailedRecordId.Should().Be(r1.Id);
     }
 }
+
+
+
+

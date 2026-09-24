@@ -13,7 +13,7 @@ A clear and concise description of what the bug is.
 ### Affected Package & Version
 
 * Package: [e.g., `EricksonLopez.Auditing.PostgreSql`, `EricksonLopez.Auditing.SqlServer`, etc.]
-* Version: [e.g., `2.1.0`]
+* Version: [e.g., `1.0.0`]
 * .NET Target Framework: [e.g., `net8.0`, `net9.0`, `net10.0`]
 * Execution Mode: [e.g., JIT, Native AOT]
 

@@ -1,9 +1,10 @@
+<!-- Copyright © Erickson Lopez. MIT License. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <Description>SQLite adapter for EricksonLopez.Auditing. Ideal for edge computing, desktop applications, local testing, and offline-first scenarios. AOT-compatible.</Description>
-    <PackageTags>$(CommonPackageTags);sqlite;embedded-database;edge;dapper;multi-tenant;native-aot</PackageTags>
+    <PackageTags>$(CommonPackageTags);sqlite;embedded-database;dapper;multi-tenant</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
